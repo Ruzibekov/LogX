@@ -29,78 +29,6 @@ public struct ConnectedDevice: Identifiable, Equatable, Sendable, Codable {
     }
 }
 
-public struct AppProfile: Identifiable, Equatable, Sendable, Codable {
-    public var id: String
-    public var label: String
-    public var shortLabel: String
-    public var pkg: String
-    public var networkSource: String
-
-    public init(
-        id: String,
-        label: String,
-        shortLabel: String,
-        pkg: String,
-        networkSource: String = "rtdb"
-    ) {
-        self.id = id
-        self.label = label
-        self.shortLabel = shortLabel
-        self.pkg = pkg
-        self.networkSource = networkSource
-    }
-
-    public static let builtIn: [AppProfile] = [
-        AppProfile(
-            id: "mahalla",
-            label: "Online Mahalla",
-            shortLabel: "Mahalla",
-            pkg: "uz.realsoft.onlinemahalla.assistant",
-            networkSource: "rtdb"
-        ),
-        AppProfile(
-            id: "ijara",
-            label: "Online Ijara",
-            shortLabel: "Ijara",
-            pkg: "uz.realsoft.onlineijara",
-            networkSource: "logcat"
-        ),
-        AppProfile(
-            id: "clean_area",
-            label: "Toza Hudud",
-            shortLabel: "Toza Hudud",
-            pkg: "realsoft.cleanarea.uz",
-            networkSource: "logcat"
-        ),
-        AppProfile(
-            id: "rsiddemo",
-            label: "RS ID Demo",
-            shortLabel: "RS ID Demo",
-            pkg: "uz.realsoft.rsid.demo",
-            networkSource: "rtdb-demo"
-        ),
-    ]
-
-    public static func resolveId(_ raw: String?) -> String {
-        let id = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if builtIn.contains(where: { $0.id == id }) { return id }
-        switch id {
-        case "online_ijara", "online-ijara", "onlineijara": return "ijara"
-        case "clean-area", "cleanarea", "toza", "tozahudud", "toza_hudud", "toza-hudud":
-            return "clean_area"
-        case "rsid", "rs-id", "demo", "rsid-demo", "rs-id-demo": return "rsiddemo"
-        case "online_mahalla", "online-mahalla", "assistant": return "mahalla"
-        default: return "mahalla"
-        }
-    }
-
-    public static func id(forPackage pkg: String?) -> String? {
-        let needle = (pkg ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return nil }
-        return builtIn.first(where: { $0.pkg == needle })?.id
-    }
-}
-
 public enum StatusClass: String, Equatable, Sendable, CaseIterable {
     case all
     case ok2xx
@@ -167,8 +95,15 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
     public var resolvedAppId: String {
         if let appId, AppProfile.builtIn.contains(where: { $0.id == appId }) { return appId }
         if let fromPkg = AppProfile.id(forPackage: packageName) { return fromPkg }
-        return "mahalla"
+        let rawApp = (appId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !rawApp.isEmpty { return AppProfile.resolveId(rawApp) }
+        let pkg = (packageName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !pkg.isEmpty { return pkg }
+        return AppProfile.unknownId
     }
+
+    public var appLabel: String { AppProfile.display(for: self).label }
+    public var appShortLabel: String { AppProfile.display(for: self).shortLabel }
 
     public var pathLabel: String {
         let raw = url.isEmpty ? api : url

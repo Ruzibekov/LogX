@@ -72,7 +72,7 @@ struct RequestDetail: View {
                 .foregroundStyle(LogXTheme.text)
                 .textSelection(.enabled)
             HStack(spacing: 12) {
-                meta("App", AppProfile.builtIn.first(where: { $0.id == log.resolvedAppId })?.label ?? "—")
+                meta("App", log.appLabel)
                 meta("Device", log.fieldDeviceLabel)
                 if let env = log.environment, !env.isEmpty {
                     meta("Env", [env, log.flavor, log.appVersion].compactMap { $0 }.joined(separator: " · "))

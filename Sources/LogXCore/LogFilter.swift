@@ -121,7 +121,8 @@ public enum LogFilter {
             log.sessionId,
             log.userInfoPinfl,
             log.responseCode.map(String.init),
-            AppProfile.builtIn.first(where: { $0.id == log.resolvedAppId })?.label,
+            log.appLabel,
+            log.appShortLabel,
         ]
         .compactMap { $0 }
         .joined(separator: " ")

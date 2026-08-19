@@ -36,6 +36,11 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertFalse(store.contains("client.logs"), store)
         XCTAssertFalse(store.contains("client.logDetail"), store)
         XCTAssertFalse(store.contains("merge(rtdb:"), store)
+        XCTAssertTrue(store.contains("AppProfile.merge(api:"), store)
+        XCTAssertTrue(store.contains("decodeLive(raw, serial: serial)"), store)
+        XCTAssertTrue(store.contains("log.serial?.trimmingCharacters"), store)
+        XCTAssertFalse(store.contains("log.serial = log.serial ?? selectedSerial"), store)
+        XCTAssertFalse(store.contains("log.serial = log.serial ?? serial"), store)
         let rail = try source("Sources/LogX/Views/DeviceRail.swift")
         XCTAssertFalse(rail.contains("TARMOQ"), rail)
         XCTAssertFalse(rail.contains("selectField"), rail)
@@ -59,5 +64,7 @@ final class ShareRetainSourceTests: XCTestCase {
         let filters = src.components(separatedBy: "private var filters").last ?? ""
         let beforeChipFn = filters.components(separatedBy: "private func chip").first ?? ""
         XCTAssertFalse(beforeChipFn.contains(".padding(10)"), beforeChipFn)
+        XCTAssertTrue(src.contains("Filterga mos so‘rov yo‘q"), src)
+        XCTAssertTrue(src.contains("log.appShortLabel"), src)
     }
 }

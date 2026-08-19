@@ -15,10 +15,44 @@ final class LogFilterTests: XCTestCase {
         XCTAssertEqual(AppProfile.id(forPackage: "realsoft.cleanarea.uz"), "clean_area")
     }
 
-    func testAppFilter_unknownPackageStaysMahalla() {
-        let log = NetworkLog(key: "x", packageName: "com.other")
-        XCTAssertEqual(log.resolvedAppId, "mahalla")
-        XCTAssertTrue(LogFilter.matchesApp(log, appId: "mahalla"))
+    func testAppFilter_unknownPackageIsNotMahalla() {
+        let log = NetworkLog(key: "x", packageName: "com.other", source: "logcat", serial: "A")
+        XCTAssertEqual(log.resolvedAppId, "com.other")
+        XCTAssertEqual(log.appShortLabel, "Other")
+        XCTAssertFalse(LogFilter.matchesApp(log, appId: "mahalla"))
+        XCTAssertTrue(LogFilter.matchesApp(log, appId: "com.other"))
+        XCTAssertTrue(LogFilter.matchesApp(log, appId: "all"))
+        XCTAssertEqual(
+            LogFilter.apply([log], appId: "mahalla", scope: .all, status: .all, query: "").map(\.key),
+            []
+        )
+        XCTAssertEqual(
+            LogFilter.apply([log], appId: "all", scope: .all, status: .all, query: "").map(\.key),
+            ["x"]
+        )
+    }
+
+    func testAppFilter_emptyPackageIsUnknownNotMahalla() {
+        let log = NetworkLog(key: "u", source: "logcat", serial: "A")
+        XCTAssertEqual(log.resolvedAppId, AppProfile.unknownId)
+        XCTAssertEqual(log.appLabel, "Noma'lum")
+        XCTAssertFalse(LogFilter.matchesApp(log, appId: "mahalla"))
+        XCTAssertTrue(LogFilter.matchesApp(log, appId: "unknown"))
+        XCTAssertTrue(LogFilter.isLocal(log))
+    }
+
+    func testAppFilter_monitorAppIdWithoutBuiltInStays() {
+        let log = NetworkLog(
+            key: "f",
+            packageName: "uz.foo.bar",
+            source: "logcat",
+            appId: "foo_bar",
+            serial: "A"
+        )
+        XCTAssertEqual(log.resolvedAppId, "foo_bar")
+        XCTAssertEqual(log.appShortLabel, "Bar")
+        XCTAssertTrue(LogFilter.matchesApp(log, appId: "foo_bar"))
+        XCTAssertFalse(LogFilter.matchesApp(log, appId: "mahalla"))
     }
 
     func testDeviceFilter_modelAndSerial() {
@@ -121,5 +155,30 @@ final class LogFilterTests: XCTestCase {
         XCTAssertEqual(AppProfile.resolveId("online-ijara"), "ijara")
         XCTAssertEqual(AppProfile.resolveId("toza"), "clean_area")
         XCTAssertEqual(AppProfile.resolveId("rsid-demo"), "rsiddemo")
+        XCTAssertEqual(AppProfile.resolveId("avto-park"), "avto_park")
+        XCTAssertEqual(AppProfile.resolveId("com.other"), "com.other")
+        XCTAssertEqual(AppProfile.resolveId(""), AppProfile.unknownId)
+        XCTAssertEqual(AppProfile.resolveId(nil), AppProfile.unknownId)
+        XCTAssertEqual(AppProfile.id(forPackage: "uz.realsoft.bukhara.avtopark"), "avto_park")
+    }
+
+    func testMergeAddsLiveUnknownPackageChip() {
+        let live = NetworkLog(
+            key: "n",
+            packageName: "uz.realsoft.new.app",
+            source: "logcat",
+            serial: "A"
+        )
+        let merged = AppProfile.merge(api: [], logs: [live])
+        XCTAssertTrue(merged.contains(where: { $0.id == "mahalla" }))
+        XCTAssertTrue(merged.contains(where: { $0.id == "avto_park" }))
+        XCTAssertEqual(merged.first(where: { $0.id == "uz.realsoft.new.app" })?.shortLabel, "App")
+        XCTAssertFalse(merged.contains(where: { $0.id == live.resolvedAppId && $0.id == "mahalla" }))
+    }
+
+    func testQueryMatchesDiscoveredAppLabel() {
+        let log = NetworkLog(key: "q", packageName: "uz.realsoft.new.app", source: "logcat", serial: "A")
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "App"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "uz.realsoft.new.app"))
     }
 }

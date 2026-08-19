@@ -24,6 +24,7 @@ final class LogStore: ObservableObject {
     private var client = MonitorClient()
     private var liveTasks: [String: Task<Void, Never>] = [:]
     private var liveByKey: [String: NetworkLog] = [:]
+    private var apiApps: [AppProfile] = AppProfile.builtIn
     private var detailSeq = DetailSeq()
 
     var selectedDevice: ConnectedDevice? {
@@ -93,7 +94,7 @@ final class LogStore: ObservableObject {
             let nextDevices = try await client.devices()
             let nextApps = try await client.apps()
             devices = nextDevices
-            apps = nextApps
+            apiApps = nextApps.isEmpty ? AppProfile.builtIn : nextApps
             serverOK = true
             rebuildFromLive()
             let pruned = DeviceScope.resolved(
@@ -138,6 +139,11 @@ final class LogStore: ObservableObject {
         favoritesOnly = false
         reconcileSelection()
         syncLiveStreams()
+    }
+
+    func toggleFavoritesOnly() {
+        favoritesOnly.toggle()
+        reconcileSelection()
     }
 
     func toggleFavorite(_ key: String) {
@@ -193,6 +199,10 @@ final class LogStore: ObservableObject {
         allLogs = liveByKey.values
             .filter { LogFilter.isLocal($0) }
             .sorted { ($0.ts ?? 0) > ($1.ts ?? 0) }
+        apps = AppProfile.merge(api: apiApps, logs: allLogs)
+        if selectedAppId != "all", !apps.contains(where: { $0.id == selectedAppId }) {
+            selectedAppId = "all"
+        }
     }
 
     private func syncLiveStreams() {
@@ -228,7 +238,7 @@ final class LogStore: ObservableObject {
                 } else if line.isEmpty {
                     if event == "http" {
                         let raw = dataLines.joined()
-                        if let item = decodeLive(raw) {
+                        if let item = decodeLive(raw, serial: serial) {
                             liveByKey[item.key] = item
                             rebuildFromLive()
                             if selectedKey == nil { selectedKey = item.key }
@@ -241,13 +251,18 @@ final class LogStore: ObservableObject {
         } catch {
             liveTasks[serial] = nil
         }
+        if !Task.isCancelled {
+            liveTasks[serial] = nil
+        }
     }
 
-    private func decodeLive(_ raw: String) -> NetworkLog? {
+    private func decodeLive(_ raw: String, serial: String) -> NetworkLog? {
         guard let data = raw.data(using: .utf8) else { return nil }
         guard let env = try? JSONDecoder().decode(LogEnvelope.self, from: data) else { return nil }
         var log = env.value.asLog(key: env.key)
-        log.serial = log.serial ?? selectedSerial
+        if log.serial?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+            log.serial = serial
+        }
         return log
     }
 

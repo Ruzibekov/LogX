@@ -91,7 +91,7 @@ enum ShareCardRenderer {
     private static func header(_ log: NetworkLog) -> Header {
         let code = log.responseCode.map(String.init) ?? "NET"
         let url = log.url.isEmpty ? log.api : log.url
-        let app = AppProfile.builtIn.first(where: { $0.id == log.resolvedAppId })?.shortLabel ?? ""
+        let app = log.appShortLabel == AppProfile.unknown.shortLabel ? "" : log.appShortLabel
         return Header(
             title: "\(log.method)  \(code)",
             meta: [url, app, log.device ?? log.deviceModel ?? ""].filter { !$0.isEmpty }.joined(separator: "  ·  ")

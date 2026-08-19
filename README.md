@@ -11,7 +11,7 @@ Ilova: `dist/LogX.app`
 ## Nima bor
 
 - Ulangan `adb` device-lar (tanlash)
-- App filter: Mahalla / Ijara / Toza Hudud / RS ID Demo
+- App filter: ulangan USB dagi har qanday ilova (Mahalla, Ijara, Toza Hudud, Avto-park, boshqalar)
 - Request / Response / Header tablar — formatlangan JSON
 - Copy · Share (rangli JSON rasm, Telegram va h.k.)
 

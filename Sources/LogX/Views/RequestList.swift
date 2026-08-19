@@ -44,7 +44,7 @@ struct RequestList: View {
                 }
                 chip("★ \(store.favoriteKeys.count)", selected: store.favoritesOnly) {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
-                        store.favoritesOnly.toggle()
+                        store.toggleFavoritesOnly()
                     }
                 }
                 Spacer()
@@ -102,6 +102,29 @@ struct RequestList: View {
                 Text("Ilovani oching yoki 8787 ni tekshiring.")
                     .font(.system(size: 12))
                     .foregroundStyle(LogXTheme.muted)
+            } else if store.selectedAppId != "all"
+                || store.status != .all
+                || store.favoritesOnly
+                || !store.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                Text("Filterga mos so‘rov yo‘q")
+                    .font(.system(size: 14, weight: .medium))
+                Text("Jami \(store.allLogs.count) ta live — boshqa ilova yoki status.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(LogXTheme.muted)
+                    .multilineTextAlignment(.center)
+                Button("Barcha ilovalar") {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                        store.selectApp("all")
+                        store.selectStatus(.all)
+                        store.applyQuery("")
+                        if store.favoritesOnly { store.toggleFavoritesOnly() }
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(LogXTheme.ember)
+                .padding(.top, 4)
             } else {
                 Text("Bu USB da live so‘rov yo‘q")
                     .font(.system(size: 14, weight: .medium))
@@ -192,6 +215,6 @@ private struct RequestRow: View {
     }
 
     private var app: String {
-        AppProfile.builtIn.first(where: { $0.id == log.resolvedAppId })?.shortLabel ?? "—"
+        log.appShortLabel
     }
 }
