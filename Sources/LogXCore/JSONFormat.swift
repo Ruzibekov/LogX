@@ -1,15 +1,17 @@
 import Foundation
 
 public enum DetailTab: String, CaseIterable, Sendable {
-    case request
     case response
+    case request
     case headers
+    case params
 
     public var title: String {
         switch self {
-        case .request: return "Request"
-        case .response: return "Response"
-        case .headers: return "Header"
+        case .response: return "Javob"
+        case .request: return "So'rov"
+        case .headers: return "Sarlavhalar"
+        case .params: return "Parametrlar"
         }
     }
 }
@@ -32,12 +34,152 @@ public enum JSONFormat {
     public static func pretty(_ raw: String?) -> String {
         let s = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return "" }
-        guard let data = s.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data),
-              let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]),
-              let text = String(data: out, encoding: .utf8)
-        else { return s }
-        return text
+
+        if let data = s.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+            if (obj is [String: Any]) || (obj is [Any]) {
+                if #available(macOS 10.15, *) {
+                    if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+                       let text = String(data: out, encoding: .utf8),
+                       !text.isEmpty {
+                        return text
+                    }
+                }
+                if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]),
+                   let text = String(data: out, encoding: .utf8),
+                   !text.isEmpty {
+                    return text
+                }
+            } else if let str = obj as? String {
+                let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                if (trimmed.hasPrefix("{") && trimmed.hasSuffix("}")) || (trimmed.hasPrefix("[") && trimmed.hasSuffix("]")) {
+                    let formatted = pretty(trimmed)
+                    if formatted.contains("\n") { return formatted }
+                }
+            }
+        }
+
+        if s.contains("{") || s.contains("[") {
+            let formatted = formatJSONFallback(s)
+            if formatted.contains("\n") {
+                return formatted
+            }
+        }
+
+        return s
+    }
+
+    public static func formatJSONFallback(_ raw: String) -> String {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return "" }
+        guard text.contains("{") || text.contains("[") else { return text }
+
+        var result = ""
+        result.reserveCapacity(text.count * 2)
+        var indent = 0
+        var inQuote: Character? = nil
+        var isEscaped = false
+        var i = text.startIndex
+
+        while i < text.endIndex {
+            let ch = text[i]
+
+            if isEscaped {
+                result.append(ch)
+                isEscaped = false
+                i = text.index(after: i)
+                continue
+            }
+
+            if inQuote != nil && ch == "\\" {
+                result.append(ch)
+                isEscaped = true
+                i = text.index(after: i)
+                continue
+            }
+
+            if ch == "\"" || ch == "'" {
+                if inQuote == ch {
+                    inQuote = nil
+                } else if inQuote == nil {
+                    inQuote = ch
+                }
+                result.append(ch)
+                i = text.index(after: i)
+                continue
+            }
+
+            if inQuote != nil {
+                result.append(ch)
+                i = text.index(after: i)
+                continue
+            }
+
+            if ch.isWhitespace {
+                i = text.index(after: i)
+                continue
+            }
+
+            if ch == "{" || ch == "[" {
+                var nextIdx = text.index(after: i)
+                while nextIdx < text.endIndex && text[nextIdx].isWhitespace {
+                    nextIdx = text.index(after: nextIdx)
+                }
+                let closing: Character = ch == "{" ? "}" : "]"
+                if nextIdx < text.endIndex && text[nextIdx] == closing {
+                    result.append(ch)
+                    result.append(closing)
+                    i = text.index(after: nextIdx)
+                    continue
+                }
+
+                indent += 1
+                result.append(ch)
+                result.append("\n")
+                result.append(String(repeating: "  ", count: indent))
+                i = text.index(after: i)
+                continue
+            }
+
+            if ch == "}" || ch == "]" {
+                indent = max(0, indent - 1)
+                while result.hasSuffix(" ") || result.hasSuffix("\t") {
+                    result.removeLast()
+                }
+                if !result.hasSuffix("\n") {
+                    result.append("\n")
+                }
+                result.append(String(repeating: "  ", count: indent))
+                result.append(ch)
+                i = text.index(after: i)
+                continue
+            }
+
+            if ch == "," {
+                while result.hasSuffix(" ") || result.hasSuffix("\t") {
+                    result.removeLast()
+                }
+                result.append(",")
+                result.append("\n")
+                result.append(String(repeating: "  ", count: indent))
+                i = text.index(after: i)
+                continue
+            }
+
+            if ch == ":" {
+                while result.hasSuffix(" ") || result.hasSuffix("\t") {
+                    result.removeLast()
+                }
+                result.append(": ")
+                i = text.index(after: i)
+                continue
+            }
+
+            result.append(ch)
+            i = text.index(after: i)
+        }
+
+        return result
     }
 
     public static func headersText(request: [String: String], response: [String: String]) -> String {
@@ -45,7 +187,7 @@ public enum JSONFormat {
             let lines = map.keys.sorted().map { "\($0): \(map[$0] ?? "")" }
             return ([title] + (lines.isEmpty ? ["—"] : lines)).joined(separator: "\n")
         }
-        return [block("REQUEST", request), "", block("RESPONSE", response)].joined(separator: "\n")
+        return [block("SO'ROV SARLAVHALARI", request), "", block("JAVOB SARLAVHALARI", response)].joined(separator: "\n")
     }
 
     public static func highlight(_ text: String) -> [JSONSpan] {
@@ -141,6 +283,28 @@ public enum JSONFormat {
         return mergePlain(spans)
     }
 
+    public static func highlightHeaders(_ text: String) -> [JSONSpan] {
+        guard !text.isEmpty else { return [] }
+        var spans: [JSONSpan] = []
+        let lines = text.components(separatedBy: "\n")
+        for (offset, line) in lines.enumerated() {
+            if line.isEmpty {
+                if offset < lines.count - 1 { spans.append(JSONSpan("\n", .punct)) }
+                continue
+            }
+            guard let idx = line.firstIndex(of: ":") else {
+                spans.append(JSONSpan(line, .plain))
+                if offset < lines.count - 1 { spans.append(JSONSpan("\n", .punct)) }
+                continue
+            }
+            spans.append(JSONSpan(String(line[..<idx]), .key))
+            spans.append(JSONSpan(":", .punct))
+            spans.append(JSONSpan(String(line[line.index(after: idx)...]), .string))
+            if offset < lines.count - 1 { spans.append(JSONSpan("\n", .punct)) }
+        }
+        return spans
+    }
+
     public static func body(for log: NetworkLog, tab: DetailTab) -> String {
         switch tab {
         case .request:
@@ -148,9 +312,13 @@ public enum JSONFormat {
         case .response:
             let raw = pretty(log.responseBody)
             if !raw.isEmpty { return raw }
-            return [log.error, log.responseMessage].compactMap { $0 }.first ?? ""
+            let fallbackMsg = [log.error, log.responseMessage, log.responseBodyMessage].compactMap { $0 }.first ?? ""
+            return pretty(fallbackMsg)
         case .headers:
             return headersText(request: log.requestHeaders, response: log.responseHeaders)
+        case .params:
+            if log.queryParams.isEmpty { return "" }
+            return log.queryParams.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
         }
     }
 

@@ -12,12 +12,17 @@ struct RequestDetail: View {
         Group {
             if let log = store.selectedLog {
                 detail(log)
-                    .id(log.key)
                     .transition(.opacity)
             } else {
-                Text("So‘rov tanlang")
-                    .foregroundStyle(LogXTheme.muted)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 12) {
+                    Image(systemName: "cursorarrow.click.2")
+                        .font(.system(size: 32))
+                        .foregroundStyle(LogXTheme.muted2)
+                    Text("So‘rov tanlang")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(LogXTheme.muted)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .animation(.easeOut(duration: 0.2), value: store.selectedKey)
@@ -28,156 +33,137 @@ struct RequestDetail: View {
         let body = JSONFormat.body(for: log, tab: tab)
         let display = body.isEmpty ? "—" : body
         return VStack(alignment: .leading, spacing: 0) {
-            header(log)
-            Divider().overlay(LogXTheme.line)
-            tabBar(copyText: display, log: log)
-            ScrollView {
-                highlighted(display, headers: tab == .headers)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(14)
-                    .textSelection(.enabled)
+            DetailHeader(
+                log: log,
+                tab: tab,
+                copied: copied,
+                onCopy: { copy(JSONFormat.body(for: log, tab: tab)) },
+                onShare: { share(log) }
+            )
+            Divider().overlay(LogXTheme.divider)
+            tabBar(log: log)
+            Divider().overlay(LogXTheme.divider)
+            ScrollView([.vertical, .horizontal]) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if tab == .params && !log.queryParams.isEmpty {
+                        paramsTable(log.queryParams)
+                    } else {
+                        Text(JSONHighlighter.attributedString(for: display, headers: tab == .headers))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(14)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(LogXTheme.well)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(LogXTheme.line, lineWidth: 1)
+                        )
+                )
+                .padding(10)
             }
+            actionBar(log)
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
         }
     }
 
-    private func header(_ log: NetworkLog) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(log.method)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(LogXTheme.method)
-                Text(log.responseCode.map(String.init) ?? "NET")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(LogXTheme.status(log.statusClass))
-                if let ms = log.durationMs {
-                    Text(ms >= 1000 ? String(format: "%.1f s", Double(ms) / 1000) : "\(ms) ms")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(LogXTheme.muted)
+    private func paramsTable(_ params: [(key: String, value: String)]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(params.enumerated()), id: \.offset) { idx, pair in
+                ParamRowView(key: pair.key, value: pair.value, isEven: idx % 2 == 0)
+                if idx < params.count - 1 {
+                    Divider().overlay(LogXTheme.divider)
                 }
-                Spacer()
-                iconButton(copied ? "checkmark" : "doc.on.doc", help: "Nusxa") {
-                    copy(JSONFormat.body(for: log, tab: tab))
-                }
-                iconButton(store.favoriteKeys.contains(log.key) ? "star.fill" : "star", help: "Sevimli") {
-                    store.toggleFavorite(log.key)
-                }
-                iconButton("square.and.arrow.up", help: "Share rasm") {
-                    share(log)
-                }
-            }
-            Text(log.url.isEmpty ? log.api : log.url)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(LogXTheme.text)
-                .textSelection(.enabled)
-            HStack(spacing: 12) {
-                meta("App", log.appLabel)
-                meta("Device", log.fieldDeviceLabel)
-                if let env = log.environment, !env.isEmpty {
-                    meta("Env", [env, log.flavor, log.appVersion].compactMap { $0 }.joined(separator: " · "))
-                }
-            }
-            HStack(spacing: 12) {
-                if let feature = log.feature, !feature.isEmpty {
-                    meta("Feature", log.moduleName ?? feature)
-                }
-                let pinfl = log.userInfoPinfl ?? log.assistantJshshir
-                if let pinfl, !pinfl.isEmpty { meta("PINFL", pinfl) }
-                if let sid = log.sessionId, !sid.isEmpty { meta("Session", sid) }
-                let did = log.requestHeaders["device-id"]
-                if let did, !did.isEmpty { meta("device-id", did) }
-            }
-            if let msg = log.responseBodyMessage ?? log.responseMessage, !msg.isEmpty {
-                Text(msg)
-                    .font(.system(size: 12))
-                    .foregroundStyle(LogXTheme.warn)
-                    .lineLimit(3)
             }
         }
-        .padding(14)
     }
 
-    private func tabBar(copyText: String, log: NetworkLog) -> some View {
-        HStack(spacing: 6) {
+    private func tabBar(log: NetworkLog) -> some View {
+        HStack(spacing: 5) {
             ForEach(DetailTab.allCases, id: \.self) { item in
                 Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                         tab = item
                     }
                 } label: {
-                    Text(item.title)
-                        .font(.system(size: 12, weight: tab == item ? .semibold : .regular))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(tab == item ? LogXTheme.select : Color.clear))
-                        .overlay(
-                            Capsule().stroke(tab == item ? LogXTheme.ember.opacity(0.5) : LogXTheme.line, lineWidth: 1)
-                        )
-                        .foregroundStyle(tab == item ? LogXTheme.text : LogXTheme.muted)
+                    HStack(spacing: 5) {
+                        Text(item.title)
+                            .font(.system(size: 11.5, weight: tab == item ? .semibold : .medium))
+                        if item == .params && !log.queryParams.isEmpty {
+                            Text("\(log.queryParams.count)")
+                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                .foregroundStyle(tab == item ? LogXTheme.accentLight : LogXTheme.muted2)
+                                .padding(.horizontal, 4.5)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule().fill(tab == item ? LogXTheme.accent.opacity(0.3) : LogXTheme.well)
+                                )
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4.5)
+                    .background(Capsule().fill(tab == item ? LogXTheme.accent.opacity(0.18) : Color.clear))
+                    .overlay(
+                        Capsule().stroke(tab == item ? LogXTheme.accent.opacity(0.5) : Color.clear, lineWidth: 1)
+                    )
+                    .foregroundStyle(tab == item ? LogXTheme.text : LogXTheme.muted)
                 }
                 .buttonStyle(.plain)
             }
             Spacer()
-            Button("Copy") { copy(copyText) }
-                .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(LogXTheme.ember)
-            Button("Share") { share(log) }
-                .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(LogXTheme.ember)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(LogXTheme.well)
+    }
+
+    private func actionBar(_ log: NetworkLog) -> some View {
+        HStack(spacing: 12) {
+            ActionPillButton(title: "Nusxa", shortcut: "⌘C", isPrimary: true) {
+                copy(JSONFormat.body(for: log, tab: tab))
+            }
+
+            ActionPillButton(title: "cURL", shortcut: "⇧C", help: "cURL buyrug'ini nusxalash") {
+                CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
+            }
+
+            ActionPillButton(title: "Ulashish", icon: "square.and.arrow.up") {
+                share(log)
+            }
+
+            Spacer(minLength: 0)
+
+            Toggle(isOn: Binding(
+                get: { store.redactEnabled },
+                set: { store.redactEnabled = $0 }
+            )) {
+                Text("Yashirish")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(store.redactEnabled ? LogXTheme.accentLight : LogXTheme.muted)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(
+                store.redactEnabled ? LogXTheme.accent.opacity(0.16) : Color.clear,
+                in: Capsule()
+            )
+            .overlay(
+                Capsule().stroke(
+                    store.redactEnabled ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1
+                )
+            )
+            .help("Ulashiladigan rasm va cURL'da token yashiriladi")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-    }
-
-    private func highlighted(_ text: String, headers: Bool) -> Text {
-        if headers {
-            return Text(text).font(.system(size: 12, design: .monospaced)).foregroundStyle(LogXTheme.text)
-        }
-        var out = Text("")
-        for span in JSONFormat.highlight(text) {
-            out = out + Text(span.text)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(spanColor(span.kind))
-        }
-        return out
-    }
-
-    private func spanColor(_ kind: JSONSpanKind) -> Color {
-        switch kind {
-        case .key: return Color(red: 0.49, green: 0.91, blue: 0.53)
-        case .string: return Color(red: 0.65, green: 0.84, blue: 1.0)
-        case .number: return LogXTheme.method
-        case .boolNull: return LogXTheme.err
-        case .punct: return LogXTheme.muted
-        case .plain: return LogXTheme.text
-        }
-    }
-
-    private func meta(_ k: String, _ v: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(k.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(LogXTheme.muted)
-            Text(v)
-                .font(.system(size: 12))
-                .foregroundStyle(LogXTheme.text)
-        }
-    }
-
-    private func iconButton(_ system: String, help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: system)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(LogXTheme.muted)
-                .frame(width: 28, height: 28)
-                .background(RoundedRectangle(cornerRadius: 6).stroke(LogXTheme.line))
-        }
-        .buttonStyle(.plain)
-        .help(help)
+        .background(LogXTheme.panel)
+        .overlay(Divider().overlay(LogXTheme.divider), alignment: .top)
     }
 
     private func copy(_ text: String) {
@@ -189,15 +175,96 @@ struct RequestDetail: View {
     }
 
     private func share(_ log: NetworkLog) {
-        guard let data = ShareCardRenderer.pngData(log: log, tab: tab) else { return }
+        guard let data = ShareCardRenderer.pngData(log: log, tab: tab, redact: store.redactEnabled) else { return }
         let dir = FileManager.default.temporaryDirectory
-        let url = dir.appendingPathComponent("logx-\(tab.rawValue).png")
+        let url = dir.appendingPathComponent("logx-\(tab.rawValue)-\(Int(Date().timeIntervalSince1970)).png")
         do {
             try data.write(to: url, options: .atomic)
         } catch {
             return
         }
         shareHost.present(url: url)
+    }
+}
+
+private struct ParamRowView: View {
+    var key: String
+    var value: String
+    var isEven: Bool
+    @State private var hovered = false
+    @State private var copied = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(key)
+                .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(LogXTheme.ok)
+                .frame(width: 140, alignment: .leading)
+            Text(value)
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundStyle(LogXTheme.text2)
+                .textSelection(.enabled)
+            Spacer()
+            if hovered || copied {
+                Button {
+                    CopyBox.plainText(value)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
+                } label: {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.muted2)
+                }
+                .buttonStyle(.plain)
+                .help(copied ? "Nusxalandi!" : "Qiymatni nusxalash")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6.5)
+        .background(hovered ? LogXTheme.panel2 : (isEven ? Color.clear : LogXTheme.panel.opacity(0.4)))
+        .onHover { hovered = $0 }
+    }
+}
+
+private struct ActionPillButton: View {
+    var title: String
+    var shortcut: String? = nil
+    var icon: String? = nil
+    var isPrimary: Bool = false
+    var help: String? = nil
+    var action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 10.5))
+                }
+                Text(title)
+                    .font(.system(size: 11.5, weight: isPrimary ? .semibold : .medium))
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundStyle(LogXTheme.muted2)
+                }
+            }
+            .foregroundStyle(hovered ? LogXTheme.text : (isPrimary ? LogXTheme.text : LogXTheme.muted))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(hovered ? LogXTheme.panel2 : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .stroke(hovered ? LogXTheme.line : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help(help ?? title)
     }
 }
 

@@ -29,7 +29,7 @@ public struct MonitorClient: Sendable {
         req.timeoutInterval = 2
         req.cachePolicy = .reloadIgnoringLocalCacheData
         do {
-            let (_, res) = try await URLSession.shared.data(for: req)
+            let (_, res) = try await MonitorSessions.rest.data(for: req)
             return (res as? HTTPURLResponse)?.statusCode == 200
         } catch {
             return false
@@ -103,7 +103,7 @@ public struct MonitorClient: Sendable {
         let data: Data
         let res: URLResponse
         do {
-            (data, res) = try await URLSession.shared.data(for: req)
+            (data, res) = try await MonitorSessions.rest.data(for: req)
         } catch {
             throw MonitorClientError.serverDown
         }

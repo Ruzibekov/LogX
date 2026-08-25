@@ -43,19 +43,83 @@ final class JSONFormatTests: XCTestCase {
             responseBody: #"{"error":"no"}"#
         )
         let headers = JSONFormat.body(for: log, tab: .headers)
-        XCTAssertTrue(headers.contains("REQUEST"))
+        XCTAssertTrue(headers.contains("SO'ROV SARLAVHALARI"))
         XCTAssertTrue(headers.contains("Accept: application/json"))
         XCTAssertTrue(headers.contains("Server: nginx"))
         XCTAssertTrue(JSONFormat.body(for: log, tab: .request).contains("\"a\""))
         XCTAssertTrue(JSONFormat.body(for: log, tab: .response).contains("error"))
         let cap = JSONFormat.shareCaption(log: log, tab: .response)
         XCTAssertTrue(cap.contains("POST 400"))
-        XCTAssertTrue(cap.contains("Response"))
+        XCTAssertTrue(cap.contains("Javob"))
     }
 
     func testEmptyBody() {
         let log = NetworkLog(key: "e")
         XCTAssertEqual(JSONFormat.body(for: log, tab: .request), "")
         XCTAssertTrue(JSONFormat.body(for: log, tab: .headers).contains("—"))
+    }
+
+    func testPrettyFormattedPolygonAndLooseJSON() {
+        let raw = #"{"error":null,"message":null,"timestamp":"yyyy-MM-dd hh:mm:ss","status":200,"polygon_str":{"type":"json","value":"{\"type\":\"MultiPolygon\",\"coordinates\":[[[64.59,40.02],[64.54,40.02]]]}"}}"#
+        let pretty = JSONFormat.pretty(raw)
+        XCTAssertTrue(pretty.contains("\n"))
+        XCTAssertTrue(pretty.contains("\"error\""))
+        XCTAssertTrue(pretty.contains("\"polygon_str\""))
+        XCTAssertTrue(pretty.hasPrefix("{\n"))
+    }
+
+    func testPrettyStringEncodedJSON() {
+        let raw = "\"{\\\"status\\\":200,\\\"message\\\":\\\"ok\\\"}\""
+        let pretty = JSONFormat.pretty(raw)
+        XCTAssertTrue(pretty.contains("\n"))
+        XCTAssertTrue(pretty.contains("\"status\""))
+        XCTAssertTrue(pretty.contains("200"))
+    }
+
+    func testFallbackTokenizerFormatsBrokenJSON() {
+        let raw = "{status: 200, items: [1, 2, 3],}"
+        let pretty = JSONFormat.pretty(raw)
+        XCTAssertTrue(pretty.contains("\n"))
+        XCTAssertTrue(pretty.contains("items:"))
+    }
+
+    func testLooseTextDecodesArbitraryJSONStructure() throws {
+        let json = """
+        {
+            "responseBody": {
+                "error": null,
+                "data": [
+                    {"id": 1, "name": "Item 1"},
+                    {"id": 2, "name": "Item 2"}
+                ]
+            }
+        }
+        """
+        struct TestContainer: Decodable {
+            var responseBody: LooseText?
+        }
+        let decoded = try JSONDecoder().decode(TestContainer.self, from: json.data(using: .utf8)!)
+        let text = decoded.responseBody?.text
+        XCTAssertNotNil(text)
+        XCTAssertTrue(text!.contains("Item 1"))
+        XCTAssertTrue(text!.contains("Item 2"))
+    }
+}
+
+final class HighlightHeadersTests: XCTestCase {
+    func testSectionPlainKeyGreenValueBlue() {
+        let text = "SO'ROV SARLAVHALARI\nAccept: application/json\nContent-Length: 524"
+        let spans = JSONFormat.highlightHeaders(text)
+        XCTAssertTrue(spans.contains { $0.kind == .plain && $0.text.contains("SARLAVHALARI") })
+        XCTAssertTrue(spans.contains { $0.kind == .key && $0.text == "Accept" })
+        XCTAssertTrue(spans.contains { $0.kind == .key && $0.text == "Content-Length" })
+        XCTAssertTrue(spans.contains { $0.kind == .string && $0.text.hasPrefix(" application/json") })
+        XCTAssertTrue(spans.contains { $0.kind == .string && $0.text == " 524" })
+    }
+
+    func testNoTrailingNewlineSpan() {
+        let spans = JSONFormat.highlightHeaders("Accept: application/json")
+        XCTAssertNotEqual(spans.last?.text, "\n")
+        XCTAssertTrue(JSONFormat.highlightHeaders("").isEmpty)
     }
 }

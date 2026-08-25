@@ -2,10 +2,17 @@ import AppKit
 import LogXCore
 
 enum ShareCardRenderer {
-    static func image(log: NetworkLog, tab: DetailTab) -> NSImage {
-        let body = JSONFormat.body(for: log, tab: tab)
-        let spans = tab == .headers ? [JSONSpan(body, .plain)] : JSONFormat.highlight(body.isEmpty ? "—" : body)
-        let caption = ShareCardRenderer.header(log)
+    static func image(log: NetworkLog, tab: DetailTab, redact: Bool = false) -> NSImage {
+        var subject = log
+        if redact {
+            subject.requestHeaders = Redactor.mask(log.requestHeaders)
+            subject.responseHeaders = Redactor.mask(log.responseHeaders)
+            subject.requestBody = Redactor.maskText(log.requestBody)
+            subject.responseBody = Redactor.maskText(log.responseBody)
+        }
+        let body = JSONFormat.body(for: subject, tab: tab)
+        let spans = (tab == .headers || tab == .params) ? [JSONSpan(body, .plain)] : JSONFormat.highlight(body.isEmpty ? "—" : body)
+        let caption = ShareCardRenderer.header(subject)
         let width: CGFloat = 920
         let pad: CGFloat = 28
         let mono = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
@@ -22,7 +29,7 @@ enum ShareCardRenderer {
         if attrBody.length == 0 {
             attrBody.append(NSAttributedString(string: "—", attributes: [
                 .font: mono,
-                .foregroundColor: NSColor(srgbRed: 0.64, green: 0.60, blue: 0.55, alpha: 1),
+                .foregroundColor: NSColor(srgbRed: 0.596, green: 0.639, blue: 0.702, alpha: 1),
             ]))
         }
 
@@ -34,27 +41,27 @@ enum ShareCardRenderer {
         let size = NSSize(width: width, height: height)
         let image = NSImage(size: size)
         image.lockFocus()
-        NSColor(srgbRed: 0.078, green: 0.071, blue: 0.063, alpha: 1).setFill()
+        NSColor(srgbRed: 0.043, green: 0.051, blue: 0.078, alpha: 1).setFill()
         NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
 
-        NSColor(srgbRed: 0.878, green: 0.478, blue: 0.239, alpha: 1).setFill()
+        NSColor(srgbRed: 0.388, green: 0.400, blue: 0.945, alpha: 1).setFill()
         NSBezierPath(rect: NSRect(x: 0, y: 0, width: 4, height: size.height)).fill()
 
         let title = NSAttributedString(string: caption.title, attributes: [
             .font: titleFont,
-            .foregroundColor: NSColor(srgbRed: 0.96, green: 0.94, blue: 0.91, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.973, green: 0.980, blue: 0.988, alpha: 1),
         ])
         title.draw(at: NSPoint(x: pad, y: size.height - 40))
 
         let meta = NSAttributedString(string: caption.meta, attributes: [
             .font: small,
-            .foregroundColor: NSColor(srgbRed: 0.64, green: 0.60, blue: 0.55, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.580, green: 0.639, blue: 0.722, alpha: 1),
         ])
         meta.draw(in: NSRect(x: pad, y: size.height - 78, width: width - pad * 2, height: 32))
 
         let tabTitle = NSAttributedString(string: tab.title.uppercased(), attributes: [
             .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-            .foregroundColor: NSColor(srgbRed: 0.878, green: 0.478, blue: 0.239, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.506, green: 0.549, blue: 0.973, alpha: 1),
             .kern: 1.1,
         ])
         tabTitle.draw(at: NSPoint(x: pad, y: size.height - 104))
@@ -66,17 +73,17 @@ enum ShareCardRenderer {
             height: size.height - 148
         ), options: [.usesLineFragmentOrigin, .usesFontLeading])
 
-        let brand = NSAttributedString(string: "LogX", attributes: [
+        let brand = NSAttributedString(string: redact ? "LogX · yashirilgan" : "LogX", attributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: NSColor(srgbRed: 0.64, green: 0.60, blue: 0.55, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.580, green: 0.639, blue: 0.722, alpha: 1),
         ])
         brand.draw(at: NSPoint(x: pad, y: 14))
         image.unlockFocus()
         return image
     }
 
-    static func pngData(log: NetworkLog, tab: DetailTab) -> Data? {
-        let img = image(log: log, tab: tab)
+    static func pngData(log: NetworkLog, tab: DetailTab, redact: Bool = false) -> Data? {
+        let img = image(log: log, tab: tab, redact: redact)
         guard let tiff = img.tiffRepresentation,
               let rep = NSBitmapImageRep(data: tiff)
         else { return nil }
@@ -100,12 +107,12 @@ enum ShareCardRenderer {
 
     private static func color(_ kind: JSONSpanKind) -> NSColor {
         switch kind {
-        case .key: return NSColor(srgbRed: 0.49, green: 0.91, blue: 0.53, alpha: 1)
-        case .string: return NSColor(srgbRed: 0.65, green: 0.84, blue: 1.0, alpha: 1)
-        case .number: return NSColor(srgbRed: 0.47, green: 0.75, blue: 1.0, alpha: 1)
-        case .boolNull: return NSColor(srgbRed: 1.0, green: 0.48, blue: 0.45, alpha: 1)
-        case .punct: return NSColor(srgbRed: 0.55, green: 0.58, blue: 0.62, alpha: 1)
-        case .plain: return NSColor(srgbRed: 0.90, green: 0.88, blue: 0.84, alpha: 1)
+        case .key: return NSColor(srgbRed: 0.063, green: 0.725, blue: 0.506, alpha: 1) // Emerald
+        case .string: return NSColor(srgbRed: 0.220, green: 0.741, blue: 0.973, alpha: 1) // Sky
+        case .number: return NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 1) // Amber
+        case .boolNull: return NSColor(srgbRed: 0.957, green: 0.247, blue: 0.369, alpha: 1) // Rose
+        case .punct: return NSColor(srgbRed: 0.392, green: 0.455, blue: 0.545, alpha: 1)
+        case .plain: return NSColor(srgbRed: 0.796, green: 0.835, blue: 0.882, alpha: 1)
         }
     }
 }

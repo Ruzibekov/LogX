@@ -106,27 +106,23 @@ public enum LogFilter {
     public static func matchesQuery(_ log: NetworkLog, query: String) -> Bool {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return true }
-        let blob = [
-            log.method,
-            log.url,
-            log.api,
-            log.packageName,
-            log.device,
-            log.deviceModel,
-            log.error,
-            log.responseMessage,
-            log.responseBodyMessage,
-            log.feature,
-            log.moduleName,
-            log.sessionId,
-            log.userInfoPinfl,
-            log.responseCode.map(String.init),
-            log.appLabel,
-            log.appShortLabel,
-        ]
-        .compactMap { $0 }
-        .joined(separator: " ")
-        return blob.range(of: q, options: .caseInsensitive) != nil
+        if log.method.range(of: q, options: .caseInsensitive) != nil { return true }
+        if log.url.range(of: q, options: .caseInsensitive) != nil { return true }
+        if log.api.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.packageName, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.device, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.deviceModel, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.error, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.responseMessage, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.responseBodyMessage, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.feature, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.moduleName, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.sessionId, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let v = log.userInfoPinfl, v.range(of: q, options: .caseInsensitive) != nil { return true }
+        if let code = log.responseCode, String(code).range(of: q, options: .caseInsensitive) != nil { return true }
+        if log.appLabel.range(of: q, options: .caseInsensitive) != nil { return true }
+        if log.appShortLabel.range(of: q, options: .caseInsensitive) != nil { return true }
+        return false
     }
 
     public static func apply(
@@ -146,16 +142,26 @@ public enum LogFilter {
         status: StatusClass,
         query: String,
         favoritesOnly: Bool = false,
-        favoriteKeys: Set<String> = []
+        favoriteKeys: Set<String> = [],
+        errorsOnly: Bool = false
     ) -> [NetworkLog] {
-        logs.filter {
-            isLocal($0)
-                && matchesApp($0, appId: appId)
-                && matchesDevice($0, scope: scope)
-                && matchesStatus($0, status: status)
-                && matchesQuery($0, query: query)
-                && (!favoritesOnly || favoriteKeys.contains($0.key))
+        logs.filter { log in
+            guard isLocal(log),
+                  matchesApp(log, appId: appId),
+                  matchesDevice(log, scope: scope) else { return false }
+            if errorsOnly {
+                guard errorClasses.contains(log.statusClass) else { return false }
+            } else {
+                guard matchesStatus(log, status: status) else { return false }
+            }
+            guard matchesQuery(log, query: query) else { return false }
+            if favoritesOnly && !favoriteKeys.contains(log.key) { return false }
+            return true
         }
         .sorted { ($0.ts ?? 0) > ($1.ts ?? 0) }
+    }
+
+    public static var errorClasses: [StatusClass] {
+        [.err4xx, .err5xx, .net]
     }
 }

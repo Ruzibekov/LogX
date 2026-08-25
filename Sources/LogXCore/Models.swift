@@ -32,6 +32,7 @@ public struct ConnectedDevice: Identifiable, Equatable, Sendable, Codable {
 public enum StatusClass: String, Equatable, Sendable, CaseIterable {
     case all
     case ok2xx
+    case redirect3xx
     case err4xx
     case err5xx
     case net
@@ -40,6 +41,7 @@ public enum StatusClass: String, Equatable, Sendable, CaseIterable {
         switch self {
         case .all: return "Barchasi"
         case .ok2xx: return "2xx"
+        case .redirect3xx: return "3xx"
         case .err4xx: return "4xx"
         case .err5xx: return "5xx"
         case .net: return "NET"
@@ -88,6 +90,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         guard let code = responseCode else { return .net }
         if code >= 500 { return .err5xx }
         if code >= 400 { return .err4xx }
+        if code >= 300 && code < 400 { return .redirect3xx }
         if code >= 200 && code < 300 { return .ok2xx }
         return .net
     }
@@ -111,6 +114,56 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         let path = parsed.path.isEmpty ? raw : parsed.path
         if let q = parsed.query, !q.isEmpty { return "\(path)?\(q)" }
         return path
+    }
+
+    public var statusDescription: String {
+        if let msg = responseMessage, !msg.isEmpty { return msg }
+        guard let code = responseCode else { return error ?? "Network Error" }
+        switch code {
+        case 200: return "OK"
+        case 201: return "Created"
+        case 202: return "Accepted"
+        case 204: return "No Content"
+        case 301: return "Moved Permanently"
+        case 302: return "Found"
+        case 304: return "Not Modified"
+        case 400: return "Bad Request"
+        case 401: return "Unauthorized"
+        case 403: return "Forbidden"
+        case 404: return "Not Found"
+        case 405: return "Method Not Allowed"
+        case 408: return "Request Timeout"
+        case 409: return "Conflict"
+        case 422: return "Unprocessable Entity"
+        case 429: return "Too Many Requests"
+        case 500: return "Internal Server Error"
+        case 502: return "Bad Gateway"
+        case 503: return "Service Unavailable"
+        case 504: return "Gateway Timeout"
+        default: return "HTTP \(code)"
+        }
+    }
+
+    public var queryParams: [(key: String, value: String)] {
+        let raw = url.isEmpty ? api : url
+        guard let components = URLComponents(string: raw),
+              let queryItems = components.queryItems,
+              !queryItems.isEmpty else { return [] }
+        return queryItems.map { ($0.name, $0.value ?? "") }
+    }
+
+    public var formattedDuration: String {
+        guard let ms = durationMs else { return "—" }
+        if ms >= 1000 { return String(format: "%.2f s", Double(ms) / 1000) }
+        return "\(ms) ms"
+    }
+
+    public var formattedBodySize: String {
+        let bytes = (responseBody?.utf8.count ?? 0)
+        guard bytes > 0 else { return "—" }
+        if bytes >= 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / 1_048_576) }
+        if bytes >= 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
+        return "\(bytes) B"
     }
 
     public init(

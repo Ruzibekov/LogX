@@ -181,4 +181,25 @@ final class LogFilterTests: XCTestCase {
         XCTAssertTrue(LogFilter.matchesQuery(log, query: "App"))
         XCTAssertTrue(LogFilter.matchesQuery(log, query: "uz.realsoft.new.app"))
     }
+
+    func testMatchesQuery_variousFields() {
+        let log = NetworkLog(
+            key: "m1",
+            method: "PATCH",
+            url: "https://api.example.com/v1/update",
+            responseCode: 422,
+            error: "Validation failed",
+            feature: "profile_edit",
+            sessionId: "sess_987654",
+            userInfoPinfl: "31234567890011"
+        )
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "PATCH"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "update"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "422"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "Validation"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "profile_edit"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "sess_987654"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "31234567890011"))
+        XCTAssertFalse(LogFilter.matchesQuery(log, query: "nonexistent_token"))
+    }
 }

@@ -34,12 +34,13 @@ enum LogXMain {
     }
 }
 
-final class LogXAppDelegate: NSObject, NSApplicationDelegate {
+final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var window: NSWindow?
     private var store: LogStore?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LogXLog.write("didFinishLaunching")
+        setupMainMenu()
         let store = MainActor.assumeIsolated { LogStore() }
         self.store = store
         let root = ContentView()
@@ -56,15 +57,103 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate {
         window.title = "LogX"
         window.contentViewController = hosting
         window.minSize = NSSize(width: 1100, height: 680)
-        window.setContentSize(NSSize(width: 1440, height: 900))
         window.isReleasedWhenClosed = false
-        window.center()
+        if !window.setFrameUsingName("LogX.Main") {
+            window.setContentSize(NSSize(width: 1440, height: 900))
+            window.center()
+        }
+        window.setFrameAutosaveName("LogX.Main")
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
         LogXLog.write("window shown \(window.frame.debugDescription)")
         Task { await store.start() }
+    }
+
+    private func setupMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenuItem.submenu = appMenu
+
+        let appName = "LogX"
+        appMenu.addItem(withTitle: "\(appName) haqida", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(NSMenuItem.separator())
+
+        let hideItem = appMenu.addItem(withTitle: "\(appName)ni yashirish", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        hideItem.keyEquivalentModifierMask = .command
+
+        let hideOthersItem = appMenu.addItem(withTitle: "Boshqalarni yashirish", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthersItem.keyEquivalentModifierMask = [.command, .option]
+
+        appMenu.addItem(withTitle: "Barchasini ko'rsatish", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(NSMenuItem.separator())
+
+        let quitItem = appMenu.addItem(withTitle: "\(appName)dan chiqish", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quitItem.keyEquivalentModifierMask = .command
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Tahrirlash")
+        editMenuItem.submenu = editMenu
+
+        editMenu.addItem(withTitle: "Kesib olish", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Nusxalash", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Qo'yish", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Barchasini tanlash", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        let sessionMenuItem = NSMenuItem()
+        mainMenu.addItem(sessionMenuItem)
+        let sessionMenu = NSMenu(title: "Sessiya")
+        sessionMenuItem.submenu = sessionMenu
+
+        let pauseItem = sessionMenu.addItem(withTitle: "Pauza", action: #selector(togglePause(_:)), keyEquivalent: "p")
+        pauseItem.target = self
+        pauseItem.keyEquivalentModifierMask = .command
+
+        let clearItem = sessionMenu.addItem(withTitle: "Ro'yxatni tozalash", action: #selector(clearLogs(_:)), keyEquivalent: "k")
+        clearItem.target = self
+        clearItem.keyEquivalentModifierMask = .command
+
+        sessionMenu.addItem(NSMenuItem.separator())
+
+        let reconnectItem = sessionMenu.addItem(withTitle: "Qayta ulash", action: #selector(reconnect(_:)), keyEquivalent: "r")
+        reconnectItem.target = self
+        reconnectItem.keyEquivalentModifierMask = .command
+
+        let windowMenuItem = NSMenuItem()
+        mainMenu.addItem(windowMenuItem)
+        let windowMenu = NSMenu(title: "Oyna")
+        windowMenuItem.submenu = windowMenu
+
+        windowMenu.addItem(withTitle: "Yopish", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: "Kichraytirish", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    @objc func togglePause(_ sender: Any?) {
+        MainActor.assumeIsolated { store?.togglePause() }
+    }
+
+    @objc func clearLogs(_ sender: Any?) {
+        MainActor.assumeIsolated { store?.clearLogs() }
+    }
+
+    @objc func reconnect(_ sender: Any?) {
+        guard let store else { return }
+        Task { await store.start() }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(togglePause(_:)) {
+            let paused = MainActor.assumeIsolated { store?.isPaused == true }
+            menuItem.title = paused ? "Davom ettirish" : "Pauza"
+        }
+        return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

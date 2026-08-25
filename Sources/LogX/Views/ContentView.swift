@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import LogXCore
 
@@ -8,20 +7,80 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             DeviceRail()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 320)
         } content: {
             RequestList()
-                .navigationSplitViewColumnWidth(min: 420, ideal: 640, max: 900)
+                .navigationSplitViewColumnWidth(min: 440, ideal: 660, max: 920)
         } detail: {
             RequestDetail()
-                .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 640)
+                .navigationSplitViewColumnWidth(min: 340, ideal: 440, max: 680)
         }
         .background(LogXTheme.bg)
         .toolbar {
             ToolbarItemGroup(placement: .principal) {
-                Text(windowTitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(LogXTheme.muted)
+                HStack(spacing: 6) {
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(LogXTheme.accentLight)
+                    Text(scopeTitle)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(LogXTheme.text2)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(LogXTheme.well)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(LogXTheme.line, lineWidth: 1)
+                        )
+                )
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        store.togglePause()
+                    }
+                } label: {
+                    Image(systemName: store.isPaused ? "play.fill" : "pause.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(store.isPaused ? LogXTheme.warn : LogXTheme.text2)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(store.isPaused ? LogXTheme.warn.opacity(0.18) : LogXTheme.well)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(store.isPaused ? LogXTheme.warn.opacity(0.5) : LogXTheme.line, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(store.isPaused ? "Davom ettirish" : "Pauza — yangi so'rovlar qabul qilinmaydi")
+
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        store.clearLogs()
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(LogXTheme.muted)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(LogXTheme.well)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(LogXTheme.line, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Ro'yxatni tozalash (⌘K)")
+                .keyboardShortcut("k", modifiers: .command)
             }
         }
         .searchable(
@@ -29,46 +88,18 @@ struct ContentView: View {
                 get: { store.query },
                 set: { store.applyQuery($0) }
             ),
-            prompt: "URL, method, status…"
+            prompt: "URL, metod, status…"
         )
-        .background(RefreshKeyCatcher { Task { await store.refresh(full: true) } })
         .onExitCommand {
             store.selectedKey = nil
         }
     }
 
-    private var windowTitle: String {
+    private var scopeTitle: String {
         let device = store.selectedScope.title
         let app = store.selectedAppId == "all"
             ? "Barcha ilovalar"
             : (store.apps.first(where: { $0.id == store.selectedAppId })?.shortLabel ?? store.selectedAppId)
-        return "LogX — \(device) · \(app)"
-    }
-}
-
-private struct RefreshKeyCatcher: NSViewRepresentable {
-    var onRefresh: () -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = CatcherView()
-        view.onRefresh = onRefresh
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? CatcherView)?.onRefresh = onRefresh
-    }
-
-    final class CatcherView: NSView {
-        var onRefresh: (() -> Void)?
-        override var acceptsFirstResponder: Bool { true }
-        override func performKeyEquivalent(with event: NSEvent) -> Bool {
-            if event.modifierFlags.contains(.command),
-               event.charactersIgnoringModifiers?.lowercased() == "r" {
-                onRefresh?()
-                return true
-            }
-            return super.performKeyEquivalent(with: event)
-        }
+        return "\(device) · \(app)"
     }
 }
