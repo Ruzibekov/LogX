@@ -305,17 +305,25 @@ public enum JSONFormat {
         return spans
     }
 
-    public static func body(for log: NetworkLog, tab: DetailTab) -> String {
+    public static func body(for log: NetworkLog, tab: DetailTab, redact: Bool = false) -> String {
         switch tab {
         case .request:
-            return pretty(log.requestBody)
+            let raw = pretty(log.requestBody)
+            return redact ? (Redactor.maskText(raw) ?? raw) : raw
         case .response:
             let raw = pretty(log.responseBody)
-            if !raw.isEmpty { return raw }
-            let fallbackMsg = [log.error, log.responseMessage, log.responseBodyMessage].compactMap { $0 }.first ?? ""
-            return pretty(fallbackMsg)
+            let text: String
+            if !raw.isEmpty {
+                text = raw
+            } else {
+                let fallbackMsg = [log.error, log.responseMessage, log.responseBodyMessage].compactMap { $0 }.first ?? ""
+                text = pretty(fallbackMsg)
+            }
+            return redact ? (Redactor.maskText(text) ?? text) : text
         case .headers:
-            return headersText(request: log.requestHeaders, response: log.responseHeaders)
+            let request = redact ? Redactor.mask(log.requestHeaders) : log.requestHeaders
+            let response = redact ? Redactor.mask(log.responseHeaders) : log.responseHeaders
+            return headersText(request: request, response: response)
         case .params:
             if log.queryParams.isEmpty { return "" }
             return log.queryParams.map { "\($0.key): \($0.value)" }.joined(separator: "\n")

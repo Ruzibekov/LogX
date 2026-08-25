@@ -2,6 +2,14 @@ import XCTest
 @testable import LogXCore
 
 final class RedesignCoreTests: XCTestCase {
+    func testClockFormatsHMSInUTC() {
+        let utc = TimeZone(secondsFromGMT: 0)!
+        XCTAssertEqual(RelativeTime.clock(ts: nil, timeZone: utc), "—")
+        XCTAssertEqual(RelativeTime.clock(ts: 1_000, timeZone: utc), "00:16:40")
+        XCTAssertEqual(RelativeTime.clock(ts: 1_000_000, timeZone: utc), "13:46:40")
+        XCTAssertEqual(RelativeTime.clock(ts: 1_000_000_000_000, timeZone: utc), "01:46:40")
+    }
+
     func testRelativeTimeLabels() {
         let now = Date(timeIntervalSince1970: 10_000)
         XCTAssertEqual(RelativeTime.label(ts: nil, now: now), "—")

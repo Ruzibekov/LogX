@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import LogXCore
 
 enum LogXLog {
     static func write(_ message: String) {
@@ -104,6 +105,10 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         editMenu.addItem(withTitle: "Nusxalash", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Qo'yish", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "Barchasini tanlash", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(NSMenuItem.separator())
+        let curlItem = editMenu.addItem(withTitle: "cURL sifatida nusxalash", action: #selector(copyCurl(_:)), keyEquivalent: "c")
+        curlItem.target = self
+        curlItem.keyEquivalentModifierMask = [.command, .shift]
 
         let sessionMenuItem = NSMenuItem()
         mainMenu.addItem(sessionMenuItem)
@@ -148,10 +153,20 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         Task { await store.start() }
     }
 
+    @objc func copyCurl(_ sender: Any?) {
+        MainActor.assumeIsolated {
+            guard let log = store?.selectedLog else { return }
+            CopyBox.plainText(CurlBuilder.command(for: log, redact: store?.redactEnabled ?? false))
+        }
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(togglePause(_:)) {
             let paused = MainActor.assumeIsolated { store?.isPaused == true }
             menuItem.title = paused ? "Davom ettirish" : "Pauza"
+        }
+        if menuItem.action == #selector(copyCurl(_:)) {
+            return MainActor.assumeIsolated { store?.selectedLog != nil }
         }
         return true
     }

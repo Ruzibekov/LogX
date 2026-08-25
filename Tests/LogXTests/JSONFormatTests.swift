@@ -53,6 +53,24 @@ final class JSONFormatTests: XCTestCase {
         XCTAssertTrue(cap.contains("Javob"))
     }
 
+    func testBodyRedactMasksHeadersAndBearer() {
+        let log = NetworkLog(
+            key: "sec",
+            method: "GET",
+            url: "https://x.uz/a",
+            requestHeaders: ["Authorization": "Bearer secret-token", "Accept": "application/json"],
+            requestBody: "Bearer secret-token rest",
+            responseBody: #"{"ok":true}"#
+        )
+        let headers = JSONFormat.body(for: log, tab: .headers, redact: true)
+        XCTAssertFalse(headers.contains("secret-token"), headers)
+        XCTAssertTrue(headers.contains("••••••"), headers)
+        XCTAssertTrue(headers.contains("Accept: application/json"), headers)
+        let request = JSONFormat.body(for: log, tab: .request, redact: true)
+        XCTAssertFalse(request.contains("secret-token"), request)
+        XCTAssertTrue(JSONFormat.body(for: log, tab: .headers, redact: false).contains("secret-token"))
+    }
+
     func testEmptyBody() {
         let log = NetworkLog(key: "e")
         XCTAssertEqual(JSONFormat.body(for: log, tab: .request), "")

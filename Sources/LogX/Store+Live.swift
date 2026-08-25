@@ -102,7 +102,10 @@ extension LogStore {
         guard !items.isEmpty else { return }
         for item in items {
             lastActivityTs = item.ts
-            if isPaused { continue }
+            if isPaused {
+                skippedWhilePaused += 1
+                continue
+            }
             liveByKey[item.key] = item
             if selectedKey == nil { selectedKey = item.key }
         }

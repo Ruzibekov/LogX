@@ -109,6 +109,8 @@ public enum LogFilter {
         if log.method.range(of: q, options: .caseInsensitive) != nil { return true }
         if log.url.range(of: q, options: .caseInsensitive) != nil { return true }
         if log.api.range(of: q, options: .caseInsensitive) != nil { return true }
+        if log.hostLabel.range(of: q, options: .caseInsensitive) != nil { return true }
+        if log.pathLabel.range(of: q, options: .caseInsensitive) != nil { return true }
         if let v = log.packageName, v.range(of: q, options: .caseInsensitive) != nil { return true }
         if let v = log.device, v.range(of: q, options: .caseInsensitive) != nil { return true }
         if let v = log.deviceModel, v.range(of: q, options: .caseInsensitive) != nil { return true }

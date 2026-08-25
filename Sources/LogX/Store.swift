@@ -24,6 +24,7 @@ final class LogStore: ObservableObject {
     @Published var selectedMethod: String = "ALL"
     @Published var errorsOnly = false
     @Published var lastActivityTs: Double?
+    @Published var skippedWhilePaused = 0
     @Published var connection: AppConnection = .booting
     @Published var streamHealthBySerial: [String: StreamHealth] = [:]
     @Published var redactEnabled = UserDefaults.standard.bool(forKey: "logx.redact") {
@@ -85,8 +86,18 @@ final class LogStore: ObservableObject {
         streamHealthBySerial.values.contains(where: \.isLive)
     }
 
+    var hasActiveFilter: Bool {
+        selectedAppId != "all"
+            || status != .all
+            || favoritesOnly
+            || errorsOnly
+            || selectedMethod != "ALL"
+            || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func togglePause() {
         isPaused.toggle()
+        if !isPaused { skippedWhilePaused = 0 }
         publishConnection()
     }
 
@@ -99,6 +110,7 @@ final class LogStore: ObservableObject {
 
     func clearLogs() {
         liveByKey.removeAll()
+        skippedWhilePaused = 0
         rebuildFromLive()
         selectedKey = nil
         selectedDetail = nil
@@ -246,6 +258,7 @@ final class LogStore: ObservableObject {
 
     func selectStatus(_ next: StatusClass) {
         status = next
+        if errorsOnly { errorsOnly = false }
         recomputeDerivedState()
         reconcileSelection()
     }

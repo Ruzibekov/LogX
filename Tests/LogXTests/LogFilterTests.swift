@@ -194,6 +194,7 @@ final class LogFilterTests: XCTestCase {
             userInfoPinfl: "31234567890011"
         )
         XCTAssertTrue(LogFilter.matchesQuery(log, query: "PATCH"))
+        XCTAssertTrue(LogFilter.matchesQuery(log, query: "api.example.com"))
         XCTAssertTrue(LogFilter.matchesQuery(log, query: "update"))
         XCTAssertTrue(LogFilter.matchesQuery(log, query: "422"))
         XCTAssertTrue(LogFilter.matchesQuery(log, query: "Validation"))

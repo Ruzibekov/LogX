@@ -135,17 +135,7 @@ struct DeviceRail: View {
             Divider().overlay(LogXTheme.divider)
 
             HStack(spacing: 9) {
-                ZStack {
-                    Circle()
-                        .fill(connectionTint)
-                        .frame(width: 8, height: 8)
-                    if store.connection == .live {
-                        Circle()
-                            .stroke(LogXTheme.ok.opacity(0.35), lineWidth: 2)
-                            .frame(width: 14, height: 14)
-                    }
-                }
-                .frame(width: 16, height: 16)
+                ConnectionDot(tint: connectionTint, pulsing: store.connection == .live)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(store.connection.title)

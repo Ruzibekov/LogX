@@ -29,41 +29,58 @@ struct RequestList: View {
     }
 
     private var filters: some View {
-        HStack(spacing: 5) {
-            segment("Barchasi", count: store.statusCount(.all), color: LogXTheme.text,
-                    active: !store.errorsOnly && store.status == .all) {
-                store.selectStatus(.all)
-            }
-            ForEach([StatusClass.ok2xx, .redirect3xx, .err4xx, .err5xx, .net], id: \.self) { item in
-                segment(item.title, count: store.statusCount(item), color: LogXTheme.status(item),
-                        active: !store.errorsOnly && store.status == item) {
-                    store.selectStatus(item)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                segment("Barchasi", count: store.statusCount(.all), color: LogXTheme.text,
+                        active: !store.errorsOnly && store.status == .all) {
+                    store.selectStatus(.all)
                 }
+                ForEach([StatusClass.ok2xx, .redirect3xx, .err4xx, .err5xx, .net], id: \.self) { item in
+                    segment(item.title, count: store.statusCount(item), color: LogXTheme.status(item),
+                            active: !store.errorsOnly && store.status == item) {
+                        store.selectStatus(item)
+                    }
+                }
+                errorPill
+                Spacer(minLength: 6)
+                if store.hasActiveFilter {
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                            store.clearFilters()
+                        }
+                    } label: {
+                        Text("Tozalash")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(LogXTheme.accentLight)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(LogXTheme.accent.opacity(0.16)))
+                            .overlay(Capsule().stroke(LogXTheme.accent.opacity(0.4), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Barcha filtrlarni tozalash")
+                }
+                Text("\(store.visibleLogs.count)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(LogXTheme.muted)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
+                    .background(Capsule().fill(LogXTheme.well))
+                    .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
             }
-            errorPill
-
-            Spacer(minLength: 8)
-
             HStack(spacing: 1) {
-                ForEach(["ALL", "GET", "POST", "PUT", "DELETE"], id: \.self) { m in
+                ForEach(["ALL", "GET", "POST", "PUT", "PATCH", "DELETE"], id: \.self) { m in
                     methodButton(m)
                 }
             }
             .padding(2)
             .background(RoundedRectangle(cornerRadius: 6).fill(LogXTheme.well).overlay(RoundedRectangle(cornerRadius: 6).stroke(LogXTheme.line, lineWidth: 1)))
-
-            Text("\(store.visibleLogs.count)")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(LogXTheme.muted)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2.5)
-                .background(Capsule().fill(LogXTheme.well))
-                .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.status)
         .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.selectedMethod)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.hasActiveFilter)
     }
 
     private func methodButton(_ method: String) -> some View {
@@ -106,7 +123,6 @@ struct RequestList: View {
     private func segment(_ title: String, count: Int, color: Color, active: Bool, action: @escaping () -> Void) -> some View {
         Button {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
-                store.errorsOnly = false
                 action()
             }
         } label: {
@@ -130,7 +146,7 @@ struct RequestList: View {
             Text("KOD").frame(width: 44, alignment: .leading)
             Text("MANZIL").frame(maxWidth: .infinity, alignment: .leading)
             Text("DAVOM").frame(width: 58, alignment: .trailing)
-            Text("QACHON").frame(width: 52, alignment: .trailing)
+            Text("QACHON").frame(width: 58, alignment: .trailing)
             Text("ILOVA").frame(width: 58, alignment: .trailing)
             Color.clear.frame(width: 24, height: 1)
         }
@@ -181,24 +197,20 @@ struct RequestList: View {
 
     private var liveBar: some View {
         HStack(spacing: 8) {
-            ZStack {
-                Circle().fill(liveBarTint).frame(width: 7, height: 7)
-                if store.connection == .live {
-                    Circle().stroke(LogXTheme.ok.opacity(0.35), lineWidth: 2).frame(width: 13, height: 13)
-                }
-            }
-            .frame(width: 14, height: 14)
+            ConnectionDot(tint: liveBarTint, pulsing: store.connection == .live)
             Text(store.connection.title)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(liveBarTint)
-            Text("\(store.allLogs.count) so'rov · oxirgisi \(RelativeTime.label(ts: store.lastActivityTs, now: now))")
+            Text(liveBarSummary)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(LogXTheme.muted2)
+                .lineLimit(1)
             Spacer(minLength: 0)
             HStack(spacing: 5) {
                 shortcutBadge("↑↓")
                 shortcutBadge("⌘F")
-                shortcutBadge("⌘R")
+                shortcutBadge("⌘P")
+                shortcutBadge("⌘⇧C")
                 shortcutBadge("⌘K")
             }
         }
@@ -207,6 +219,15 @@ struct RequestList: View {
         .background(LogXTheme.panel)
         .overlay(Divider().overlay(LogXTheme.divider), alignment: .top)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.connection)
+    }
+
+    private var liveBarSummary: String {
+        var parts = ["\(store.allLogs.count) so'rov"]
+        if store.isPaused, store.skippedWhilePaused > 0 {
+            parts.append("\(store.skippedWhilePaused) o'tkazildi")
+        }
+        parts.append("oxirgisi \(RelativeTime.label(ts: store.lastActivityTs, now: now))")
+        return parts.joined(separator: " · ")
     }
 
     private var liveBarTint: Color {
@@ -270,35 +291,44 @@ private struct RequestRow: View {
                 .foregroundStyle(LogXTheme.status(log.statusClass))
                 .frame(width: 44, alignment: .leading)
 
-            HStack(spacing: 6) {
-                Text(log.pathLabel)
-                    .font(.system(size: 11.5, weight: selected ? .medium : .regular, design: .monospaced))
-                    .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                if RelativeTime.isFresh(ts: log.ts, now: now) {
-                    Text("YANGI")
-                        .font(.system(size: 8, weight: .heavy))
-                        .tracking(0.7)
-                        .foregroundStyle(LogXTheme.ok)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1.5)
-                        .background(LogXTheme.ok.opacity(0.18), in: RoundedRectangle(cornerRadius: 3.5))
+            VStack(alignment: .leading, spacing: 1) {
+                if !log.hostLabel.isEmpty {
+                    Text(log.hostLabel)
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundStyle(LogXTheme.muted)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
+                HStack(spacing: 6) {
+                    Text(log.pathLabel)
+                        .font(.system(size: 11.5, weight: selected ? .medium : .regular, design: .monospaced))
+                        .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
 
-                if hovered || copied {
-                    Button {
-                        CopyBox.plainText(log.pathLabel)
-                        copied = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
-                    } label: {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 9.5))
-                            .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.muted)
+                    if RelativeTime.isFresh(ts: log.ts, now: now) {
+                        Text("YANGI")
+                            .font(.system(size: 8, weight: .heavy))
+                            .tracking(0.7)
+                            .foregroundStyle(LogXTheme.ok)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1.5)
+                            .background(LogXTheme.ok.opacity(0.18), in: RoundedRectangle(cornerRadius: 3.5))
                     }
-                    .buttonStyle(.plain)
-                    .help(copied ? "Nusxalandi!" : "API manzilini nusxalash (\(log.pathLabel))")
+
+                    if hovered || copied {
+                        Button {
+                            CopyBox.plainText(log.url.isEmpty ? log.api : log.url)
+                            copied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
+                        } label: {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.muted)
+                        }
+                        .buttonStyle(.plain)
+                        .help(copied ? "Nusxalandi!" : "URL nusxalash")
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -308,10 +338,11 @@ private struct RequestRow: View {
                 .foregroundStyle(durationColor)
                 .frame(width: 58, alignment: .trailing)
 
-            Text(RelativeTime.label(ts: log.ts, now: now))
+            Text(RelativeTime.clock(ts: log.ts))
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(LogXTheme.muted2)
-                .frame(width: 52, alignment: .trailing)
+                .frame(width: 58, alignment: .trailing)
+                .help(RelativeTime.label(ts: log.ts, now: now))
 
             Text(log.appShortLabel)
                 .font(.system(size: 10, weight: .medium))
@@ -325,7 +356,7 @@ private struct RequestRow: View {
             hoverStar.frame(width: 24, alignment: .trailing)
         }
         .padding(.horizontal, 11)
-        .frame(minHeight: 38)
+        .frame(minHeight: log.hostLabel.isEmpty ? 38 : 46)
         .background(selected ? LogXTheme.accent.opacity(0.12) : (hovered ? LogXTheme.panel2 : Color.clear))
         .contentShape(Rectangle())
         .onHover { hovered = $0 }

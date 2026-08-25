@@ -6,6 +6,7 @@ struct RequestDetail: View {
     @EnvironmentObject private var store: LogStore
     @State private var tab: DetailTab = .response
     @State private var copied = false
+    @AppStorage("logx.wrapBody") private var wrapBody = true
     @StateObject private var shareHost = SharePickerHost()
 
     var body: some View {
@@ -30,28 +31,25 @@ struct RequestDetail: View {
     }
 
     private func detail(_ log: NetworkLog) -> some View {
-        let body = JSONFormat.body(for: log, tab: tab)
+        let body = JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled)
         let display = body.isEmpty ? "—" : body
         return VStack(alignment: .leading, spacing: 0) {
             DetailHeader(
                 log: log,
                 tab: tab,
                 copied: copied,
-                onCopy: { copy(JSONFormat.body(for: log, tab: tab)) },
+                onCopy: { copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled)) },
                 onShare: { share(log) }
             )
             Divider().overlay(LogXTheme.divider)
             tabBar(log: log)
             Divider().overlay(LogXTheme.divider)
-            ScrollView([.vertical, .horizontal]) {
+            ScrollView(wrapBody ? [.vertical] : [.vertical, .horizontal]) {
                 VStack(alignment: .leading, spacing: 0) {
                     if tab == .params && !log.queryParams.isEmpty {
                         paramsTable(log.queryParams)
                     } else {
-                        Text(JSONHighlighter.attributedString(for: display, headers: tab == .headers))
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .padding(14)
+                        jsonBody(display, headers: tab == .headers)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -68,6 +66,18 @@ struct RequestDetail: View {
             actionBar(log)
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private func jsonBody(_ display: String, headers: Bool) -> some View {
+        let text = Text(JSONHighlighter.attributedString(for: display, headers: headers))
+            .textSelection(.enabled)
+            .padding(14)
+        if wrapBody {
+            text.frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            text.fixedSize(horizontal: true, vertical: false)
         }
     }
 
@@ -113,23 +123,53 @@ struct RequestDetail: View {
                     .foregroundStyle(tab == item ? LogXTheme.text : LogXTheme.muted)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(tabShortcut(item), modifiers: .command)
             }
             Spacer()
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                    wrapBody.toggle()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: wrapBody ? "text.alignleft" : "arrow.left.and.right")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(wrapBody ? "Qator" : "Lenta")
+                        .font(.system(size: 10.5, weight: .semibold))
+                }
+                .foregroundStyle(wrapBody ? LogXTheme.text : LogXTheme.muted)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(wrapBody ? LogXTheme.accent.opacity(0.18) : Color.clear))
+                .overlay(Capsule().stroke(wrapBody ? LogXTheme.accent.opacity(0.45) : LogXTheme.line, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .help(wrapBody ? "Uzun qatorni gorizontal aylanma qilish" : "Matnni oynaga sig'dirish")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(LogXTheme.well)
     }
 
+    private func tabShortcut(_ item: DetailTab) -> KeyEquivalent {
+        switch item {
+        case .response: return "1"
+        case .request: return "2"
+        case .headers: return "3"
+        case .params: return "4"
+        }
+    }
+
     private func actionBar(_ log: NetworkLog) -> some View {
         HStack(spacing: 12) {
             ActionPillButton(title: "Nusxa", shortcut: "⌘C", isPrimary: true) {
-                copy(JSONFormat.body(for: log, tab: tab))
+                copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled))
             }
 
-            ActionPillButton(title: "cURL", shortcut: "⇧C", help: "cURL buyrug'ini nusxalash") {
+            ActionPillButton(title: "cURL", shortcut: "⌘⇧C", help: "cURL buyrug'ini nusxalash (⌘⇧C)") {
                 CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
             }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
 
             ActionPillButton(title: "Ulashish", icon: "square.and.arrow.up") {
                 share(log)
@@ -158,7 +198,7 @@ struct RequestDetail: View {
                     store.redactEnabled ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1
                 )
             )
-            .help("Ulashiladigan rasm va cURL'da token yashiriladi")
+            .help("Ekran, cURL va ulashishda token yashiriladi")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)

@@ -46,10 +46,12 @@ struct RequestEmptyView: View {
                         tint: store.connection == .paused ? LogXTheme.warn : LogXTheme.accentLight,
                         title: store.connection == .paused ? "Pauza" : (store.banner ?? "So'rov yo'q"),
                         subtitle: store.connection == .paused
-                            ? "Yangi so'rovlar qabul qilinmaydi."
+                            ? (store.skippedWhilePaused > 0
+                               ? "\(store.skippedWhilePaused) ta so'rov o'tkazib yuborildi."
+                               : "Yangi so'rovlar qabul qilinmaydi.")
                             : "Ilovani oching — USB stream jonli."
                     )
-                } else if hasActiveFilter {
+                } else if store.hasActiveFilter {
                     filterEmpty
                 } else {
                     usbEmpty
@@ -60,15 +62,6 @@ struct RequestEmptyView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.connection)
         .transition(.opacity)
-    }
-
-    private var hasActiveFilter: Bool {
-        store.selectedAppId != "all"
-            || store.status != .all
-            || store.favoritesOnly
-            || store.errorsOnly
-            || store.selectedMethod != "ALL"
-            || !store.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var reconnectButton: some View {

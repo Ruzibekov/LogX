@@ -58,7 +58,8 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help(store.isPaused ? "Davom ettirish" : "Pauza — yangi so'rovlar qabul qilinmaydi")
+                .help(store.isPaused ? "Davom ettirish (⌘P)" : "Pauza — yangi so'rovlar qabul qilinmaydi (⌘P)")
+                .keyboardShortcut("p", modifiers: .command)
 
                 Button {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
@@ -88,7 +89,7 @@ struct ContentView: View {
                 get: { store.query },
                 set: { store.applyQuery($0) }
             ),
-            prompt: "URL, metod, status…"
+            prompt: "Host, URL, metod, status…"
         )
         .onExitCommand {
             store.selectedKey = nil

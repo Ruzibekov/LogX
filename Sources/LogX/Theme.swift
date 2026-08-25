@@ -47,3 +47,38 @@ enum LogXTheme {
         }
     }
 }
+
+struct ConnectionDot: View {
+    var tint: Color
+    var pulsing: Bool
+
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(tint)
+                .frame(width: 7, height: 7)
+            if pulsing {
+                Circle()
+                    .stroke(tint.opacity(0.4), lineWidth: 2)
+                    .frame(width: 13, height: 13)
+                    .scaleEffect(pulse ? 1.28 : 1.0)
+                    .opacity(pulse ? 0.25 : 0.85)
+            }
+        }
+        .frame(width: 16, height: 16)
+        .onAppear {
+            if pulsing { pulse = true }
+        }
+        .onChange(of: pulsing) { _, on in
+            pulse = on
+        }
+        .animation(
+            pulsing
+                ? .spring(response: 0.9, dampingFraction: 0.42).repeatForever(autoreverses: true)
+                : .spring(response: 0.28, dampingFraction: 0.86),
+            value: pulse
+        )
+    }
+}

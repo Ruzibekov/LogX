@@ -21,4 +21,22 @@ public enum RelativeTime {
         let seconds = ts > 10_000_000_000 ? ts / 1000 : ts
         return now.timeIntervalSince1970 - seconds < freshWindow
     }
+
+    public static func clock(ts: Double?, timeZone: TimeZone = .current) -> String {
+        guard let ts else { return "—" }
+        let seconds = ts > 10_000_000_000 ? ts / 1000 : ts
+        let date = Date(timeIntervalSince1970: seconds)
+        clockLock.lock()
+        defer { clockLock.unlock() }
+        clockFormatter.timeZone = timeZone
+        return clockFormatter.string(from: date)
+    }
+
+    private static let clockLock = NSLock()
+    private static let clockFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_GB")
+        return formatter
+    }()
 }
