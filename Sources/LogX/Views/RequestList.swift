@@ -75,12 +75,29 @@ struct RequestList: View {
             }
             .padding(2)
             .background(RoundedRectangle(cornerRadius: 6).fill(LogXTheme.well).overlay(RoundedRectangle(cornerRadius: 6).stroke(LogXTheme.line, lineWidth: 1)))
+            HStack(spacing: 5) {
+                noiseToggle
+                slowPill
+                if store.uniqueHosts.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 5) {
+                            ForEach(store.uniqueHosts, id: \.self) { host in
+                                hostChip(host)
+                            }
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.status)
         .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.selectedMethod)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.hasActiveFilter)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.hideNoise)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.slowOnly)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.selectedHost)
     }
 
     private func methodButton(_ method: String) -> some View {
@@ -98,6 +115,62 @@ struct RequestList: View {
                 .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(store.selectedMethod == method ? LogXTheme.line : Color.clear, lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+
+    private var noiseToggle: some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                store.toggleHideNoise()
+            }
+        } label: {
+            Text("Shovqin")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(store.hideNoise ? LogXTheme.accentLight : LogXTheme.muted)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(store.hideNoise ? LogXTheme.accent.opacity(0.16) : Color.clear))
+                .overlay(Capsule().stroke(store.hideNoise ? LogXTheme.accent.opacity(0.4) : LogXTheme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help("Analytics, health, ping va rasm so'rovlarini yashirish")
+    }
+
+    private var slowPill: some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                store.toggleSlowOnly()
+            }
+        } label: {
+            Text("Sekin")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(store.slowOnly ? LogXTheme.warn : LogXTheme.muted)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(store.slowOnly ? LogXTheme.warn.opacity(0.18) : Color.clear))
+                .overlay(Capsule().stroke(store.slowOnly ? LogXTheme.warn.opacity(0.5) : LogXTheme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help("Faqat ≥ 800 ms")
+    }
+
+    private func hostChip(_ host: String) -> some View {
+        let active = store.selectedHost == host
+        return Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                store.selectHost(host)
+            }
+        } label: {
+            Text(host)
+                .font(.system(size: 10, weight: active ? .semibold : .medium, design: .monospaced))
+                .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(active ? LogXTheme.accent.opacity(0.18) : Color.clear))
+                .overlay(Capsule().stroke(active ? LogXTheme.accent.opacity(0.45) : LogXTheme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help(host)
     }
 
     private var errorPill: some View {
@@ -185,10 +258,24 @@ struct RequestList: View {
     @ViewBuilder
     private func rowMenu(_ log: NetworkLog) -> some View {
         Button("URL'ni nusxalash") { CopyBox.plainText(log.url.isEmpty ? log.api : log.url) }
+        Button("Qatorni nusxalash") {
+            CopyBox.plainText("\(log.method) \(log.hostLabel) \(log.pathLabel) \(log.appShortLabel) \(RelativeTime.clock(ts: log.ts))")
+        }
+        Button("Yo'lni nusxalash") { CopyBox.plainText(log.pathLabel) }
         Button("cURL sifatida nusxalash") {
             CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
         }
+        Button("So'rov bodyni nusxalash") { CopyBox.plainText(log.requestBody ?? "") }
         Button("Javobni nusxalash") { CopyBox.plainText(log.responseBody ?? "") }
+        Button("Sarlavhalarni nusxalash") {
+            let req = store.redactEnabled ? Redactor.mask(log.requestHeaders) : log.requestHeaders
+            let res = store.redactEnabled ? Redactor.mask(log.responseHeaders) : log.responseHeaders
+            CopyBox.plainText(JSONFormat.headersText(request: req, response: res))
+        }
+        Button("HAR nusxalash") {
+            let data = SessionExport.har(logs: [log], redact: store.redactEnabled)
+            CopyBox.plainText(String(data: data, encoding: .utf8) ?? "")
+        }
         Divider()
         Button(store.favoriteKeys.contains(log.key) ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish") {
             store.toggleFavorite(log.key)
@@ -258,135 +345,5 @@ enum CopyBox {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(raw.isEmpty ? "—" : raw, forType: .string)
-    }
-}
-
-private struct RequestRow: View {
-    @EnvironmentObject private var store: LogStore
-    var log: NetworkLog
-    var selected: Bool
-    var now: Date
-    @State private var hovered = false
-    @State private var copied = false
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Rectangle()
-                .fill(selected ? LogXTheme.accentLight : Color.clear)
-                .frame(width: 3)
-                .padding(.vertical, 3)
-
-            HStack {
-                Text(log.method)
-                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                    .foregroundStyle(LogXTheme.methodColor(log.method))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(LogXTheme.methodColor(log.method).opacity(0.15)))
-            }
-            .frame(width: 58, alignment: .leading)
-
-            Text(log.responseCode.map(String.init) ?? "NET")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(LogXTheme.status(log.statusClass))
-                .frame(width: 44, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 1) {
-                if !log.hostLabel.isEmpty {
-                    Text(log.hostLabel)
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundStyle(LogXTheme.muted)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                HStack(spacing: 6) {
-                    Text(log.pathLabel)
-                        .font(.system(size: 11.5, weight: selected ? .medium : .regular, design: .monospaced))
-                        .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    if RelativeTime.isFresh(ts: log.ts, now: now) {
-                        Text("YANGI")
-                            .font(.system(size: 8, weight: .heavy))
-                            .tracking(0.7)
-                            .foregroundStyle(LogXTheme.ok)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1.5)
-                            .background(LogXTheme.ok.opacity(0.18), in: RoundedRectangle(cornerRadius: 3.5))
-                    }
-
-                    if hovered || copied {
-                        Button {
-                            CopyBox.plainText(log.url.isEmpty ? log.api : log.url)
-                            copied = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
-                        } label: {
-                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.muted)
-                        }
-                        .buttonStyle(.plain)
-                        .help(copied ? "Nusxalandi!" : "URL nusxalash")
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(duration)
-                .font(.system(size: 10.5, design: .monospaced))
-                .foregroundStyle(durationColor)
-                .frame(width: 58, alignment: .trailing)
-
-            Text(RelativeTime.clock(ts: log.ts))
-                .font(.system(size: 10.5, design: .monospaced))
-                .foregroundStyle(LogXTheme.muted2)
-                .frame(width: 58, alignment: .trailing)
-                .help(RelativeTime.label(ts: log.ts, now: now))
-
-            Text(log.appShortLabel)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(LogXTheme.muted)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1.5)
-                .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 3.5))
-                .frame(width: 58, alignment: .trailing)
-                .lineLimit(1)
-
-            hoverStar.frame(width: 24, alignment: .trailing)
-        }
-        .padding(.horizontal, 11)
-        .frame(minHeight: log.hostLabel.isEmpty ? 38 : 46)
-        .background(selected ? LogXTheme.accent.opacity(0.12) : (hovered ? LogXTheme.panel2 : Color.clear))
-        .contentShape(Rectangle())
-        .onHover { hovered = $0 }
-    }
-
-    @ViewBuilder
-    private var hoverStar: some View {
-        if hovered || store.favoriteKeys.contains(log.key) {
-            Button {
-                store.toggleFavorite(log.key)
-            } label: {
-                Image(systemName: store.favoriteKeys.contains(log.key) ? "star.fill" : "star")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(store.favoriteKeys.contains(log.key) ? LogXTheme.warn : LogXTheme.muted2)
-            }
-            .buttonStyle(.plain)
-            .help("Sevimli")
-        }
-    }
-
-    private var duration: String {
-        guard let ms = log.durationMs else { return "—" }
-        if ms >= 1000 { return String(format: "%.1f s", Double(ms) / 1000) }
-        return "\(ms) ms"
-    }
-
-    private var durationColor: Color {
-        guard let ms = log.durationMs else { return LogXTheme.muted2 }
-        if ms >= 3000 { return LogXTheme.err }
-        if ms >= 800 { return LogXTheme.warn }
-        return LogXTheme.muted
     }
 }

@@ -63,6 +63,47 @@ struct ContentView: View {
 
                 Button {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        store.toggleFollowLatest()
+                    }
+                } label: {
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(store.followLatest ? LogXTheme.accentLight : LogXTheme.text2)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(store.followLatest ? LogXTheme.accent.opacity(0.18) : LogXTheme.well)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(store.followLatest ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(store.followLatest ? "Kuzat yoqilgan — yangi so'rov tanlanadi" : "Kuzat — yangi so'rovni tanlash")
+
+                Menu {
+                    Button("HAR saqlash") { store.exportHAR() }
+                    Button("JSON saqlash") { store.exportJSON() }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(LogXTheme.muted)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(LogXTheme.well)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(LogXTheme.line, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Saqlash — HAR yoki JSON")
+
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                         store.clearLogs()
                     }
                 } label: {
@@ -89,7 +130,7 @@ struct ContentView: View {
                 get: { store.query },
                 set: { store.applyQuery($0) }
             ),
-            prompt: "Host, URL, metod, status…"
+            prompt: "Host, URL, body, header…"
         )
         .onExitCommand {
             store.selectedKey = nil

@@ -100,6 +100,8 @@ extension LogStore {
 
     func ingestBatch(_ items: [NetworkLog]) {
         guard !items.isEmpty else { return }
+        var ingested: [NetworkLog] = []
+        ingested.reserveCapacity(items.count)
         for item in items {
             lastActivityTs = item.ts
             if isPaused {
@@ -107,10 +109,21 @@ extension LogStore {
                 continue
             }
             liveByKey[item.key] = item
+            ingested.append(item)
             if selectedKey == nil { selectedKey = item.key }
         }
         if !isPaused {
             rebuildFromLive()
+            if followLatest,
+               let key = FollowLatest.selectedKey(
+                batch: ingested,
+                currentKey: selectedKey,
+                follow: true,
+                paused: false
+               ) {
+                selectedKey = key
+                Task { await loadDetail(key) }
+            }
         }
     }
 

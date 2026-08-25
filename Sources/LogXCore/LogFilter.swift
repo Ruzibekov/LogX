@@ -106,25 +106,57 @@ public enum LogFilter {
     public static func matchesQuery(_ log: NetworkLog, query: String) -> Bool {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return true }
-        if log.method.range(of: q, options: .caseInsensitive) != nil { return true }
-        if log.url.range(of: q, options: .caseInsensitive) != nil { return true }
-        if log.api.range(of: q, options: .caseInsensitive) != nil { return true }
-        if log.hostLabel.range(of: q, options: .caseInsensitive) != nil { return true }
-        if log.pathLabel.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.packageName, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.device, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.deviceModel, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.error, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.responseMessage, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.responseBodyMessage, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.feature, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.moduleName, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.sessionId, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let v = log.userInfoPinfl, v.range(of: q, options: .caseInsensitive) != nil { return true }
-        if let code = log.responseCode, String(code).range(of: q, options: .caseInsensitive) != nil { return true }
-        if log.appLabel.range(of: q, options: .caseInsensitive) != nil { return true }
-        if log.appShortLabel.range(of: q, options: .caseInsensitive) != nil { return true }
+        func hit(_ s: String?) -> Bool {
+            guard let s, !s.isEmpty else { return false }
+            return s.range(of: q, options: .caseInsensitive) != nil
+        }
+        if hit(log.method) { return true }
+        if hit(log.url) { return true }
+        if hit(log.api) { return true }
+        if hit(log.hostLabel) { return true }
+        if hit(log.pathLabel) { return true }
+        if hit(log.packageName) { return true }
+        if hit(log.device) { return true }
+        if hit(log.deviceModel) { return true }
+        if hit(log.error) { return true }
+        if hit(log.responseMessage) { return true }
+        if hit(log.responseBodyMessage) { return true }
+        if hit(log.feature) { return true }
+        if hit(log.moduleName) { return true }
+        if hit(log.sessionId) { return true }
+        if hit(log.userInfoPinfl) { return true }
+        if let code = log.responseCode, hit(String(code)) { return true }
+        if hit(log.appLabel) { return true }
+        if hit(log.appShortLabel) { return true }
+        if hit(log.requestBody) { return true }
+        if hit(log.responseBody) { return true }
+        for (key, value) in log.requestHeaders {
+            if hit(key) || hit(value) { return true }
+        }
+        for (key, value) in log.responseHeaders {
+            if hit(key) || hit(value) { return true }
+        }
+        for pair in log.queryParams {
+            if hit(pair.key) || hit(pair.value) { return true }
+        }
         return false
+    }
+
+    public static func matchesMethod(_ log: NetworkLog, method: String) -> Bool {
+        let m = method.trimmingCharacters(in: .whitespacesAndNewlines)
+        if m.isEmpty || m.uppercased() == "ALL" { return true }
+        return log.method.uppercased() == m.uppercased()
+    }
+
+    public static func matchesHost(_ log: NetworkLog, host: String?) -> Bool {
+        guard let host, !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
+        return log.hostLabel.caseInsensitiveCompare(host) == .orderedSame
+    }
+
+    public static func matchesSlow(_ log: NetworkLog, slowOnly: Bool) -> Bool {
+        guard slowOnly else { return true }
+        guard let ms = log.durationMs else { return false }
+        return ms >= LogNoise.slowThresholdMs
     }
 
     public static func apply(
@@ -145,12 +177,20 @@ public enum LogFilter {
         query: String,
         favoritesOnly: Bool = false,
         favoriteKeys: Set<String> = [],
-        errorsOnly: Bool = false
+        errorsOnly: Bool = false,
+        method: String = "ALL",
+        hideNoise: Bool = false,
+        slowOnly: Bool = false,
+        selectedHost: String? = nil
     ) -> [NetworkLog] {
         logs.filter { log in
             guard isLocal(log),
                   matchesApp(log, appId: appId),
                   matchesDevice(log, scope: scope) else { return false }
+            if hideNoise && LogNoise.isNoise(log) { return false }
+            guard matchesMethod(log, method: method) else { return false }
+            guard matchesHost(log, host: selectedHost) else { return false }
+            guard matchesSlow(log, slowOnly: slowOnly) else { return false }
             if errorsOnly {
                 guard errorClasses.contains(log.statusClass) else { return false }
             } else {
@@ -161,6 +201,42 @@ public enum LogFilter {
             return true
         }
         .sorted { ($0.ts ?? 0) > ($1.ts ?? 0) }
+    }
+
+    public static func statusCounts(
+        _ logs: [NetworkLog],
+        appId: String?,
+        scope: DeviceScope,
+        query: String,
+        favoritesOnly: Bool = false,
+        favoriteKeys: Set<String> = [],
+        method: String = "ALL",
+        hideNoise: Bool = false,
+        slowOnly: Bool = false,
+        selectedHost: String? = nil
+    ) -> [StatusClass: Int] {
+        var counts: [StatusClass: Int] = [
+            .all: 0, .ok2xx: 0, .redirect3xx: 0, .err4xx: 0, .err5xx: 0, .net: 0,
+        ]
+        let filtered = apply(
+            logs,
+            appId: appId,
+            scope: scope,
+            status: .all,
+            query: query,
+            favoritesOnly: favoritesOnly,
+            favoriteKeys: favoriteKeys,
+            errorsOnly: false,
+            method: method,
+            hideNoise: hideNoise,
+            slowOnly: slowOnly,
+            selectedHost: selectedHost
+        )
+        for log in filtered {
+            counts[.all, default: 0] += 1
+            counts[log.statusClass, default: 0] += 1
+        }
+        return counts
     }
 
     public static var errorClasses: [StatusClass] {

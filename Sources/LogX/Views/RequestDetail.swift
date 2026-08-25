@@ -6,6 +6,8 @@ struct RequestDetail: View {
     @EnvironmentObject private var store: LogStore
     @State private var tab: DetailTab = .response
     @State private var copied = false
+    @State private var findQuery = ""
+    @State private var findIndex = 0
     @AppStorage("logx.wrapBody") private var wrapBody = true
     @StateObject private var shareHost = SharePickerHost()
 
@@ -44,9 +46,11 @@ struct RequestDetail: View {
             Divider().overlay(LogXTheme.divider)
             tabBar(log: log)
             Divider().overlay(LogXTheme.divider)
+            DetailFindBar(query: $findQuery, index: $findIndex, display: display)
+            Divider().overlay(LogXTheme.divider)
             ScrollView(wrapBody ? [.vertical] : [.vertical, .horizontal]) {
                 VStack(alignment: .leading, spacing: 0) {
-                    if tab == .params && !log.queryParams.isEmpty {
+                    if tab == .params && !log.queryParams.isEmpty && findQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         paramsTable(log.queryParams)
                     } else {
                         jsonBody(display, headers: tab == .headers)
@@ -67,11 +71,25 @@ struct RequestDetail: View {
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
         }
+        .onChange(of: store.selectedKey) { _, _ in
+            findQuery = ""
+            findIndex = 0
+        }
+        .onChange(of: tab) { _, _ in
+            findIndex = 0
+        }
     }
 
     @ViewBuilder
     private func jsonBody(_ display: String, headers: Bool) -> some View {
-        let text = Text(JSONHighlighter.attributedString(for: display, headers: headers))
+        let matches = JSONFind.matches(display, query: findQuery)
+        let active = matches.isEmpty ? nil : min(max(findIndex, 0), matches.count - 1)
+        let text = Text(JSONHighlighter.attributedString(
+            for: display,
+            headers: headers,
+            highlights: matches,
+            activeIndex: active
+        ))
             .textSelection(.enabled)
             .padding(14)
         if wrapBody {

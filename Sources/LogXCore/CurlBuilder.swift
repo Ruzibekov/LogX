@@ -69,4 +69,57 @@ public enum Redactor {
         }
         return out
     }
+
+    public static func maskJSON(_ text: String) -> String {
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return text
+        }
+        if let dict = obj as? [String: Any] {
+            return stringify(maskJSONValue(dict)) ?? text
+        }
+        if let arr = obj as? [Any] {
+            return stringify(maskJSONValue(arr)) ?? text
+        }
+        if let s = obj as? String {
+            return maskText(s) ?? s
+        }
+        return text
+    }
+
+    public static func redactBody(_ text: String?) -> String? {
+        guard let text, !text.isEmpty else { return text }
+        let jsonMasked = maskJSON(text)
+        return maskText(jsonMasked) ?? jsonMasked
+    }
+
+    private static func maskJSONValue(_ value: Any) -> Any {
+        if let dict = value as? [String: Any] {
+            var out: [String: Any] = [:]
+            out.reserveCapacity(dict.count)
+            for (key, nested) in dict {
+                if isSensitive(key) {
+                    out[key] = "••••••"
+                } else {
+                    out[key] = maskJSONValue(nested)
+                }
+            }
+            return out
+        }
+        if let arr = value as? [Any] {
+            return arr.map { maskJSONValue($0) }
+        }
+        if let s = value as? String {
+            return maskText(s) ?? s
+        }
+        return value
+    }
+
+    private static func stringify(_ value: Any) -> String? {
+        guard JSONSerialization.isValidJSONObject(value) else { return nil }
+        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
 }

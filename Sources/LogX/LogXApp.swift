@@ -129,6 +129,23 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         reconnectItem.target = self
         reconnectItem.keyEquivalentModifierMask = .command
 
+        sessionMenu.addItem(NSMenuItem.separator())
+
+        let followItem = sessionMenu.addItem(withTitle: "Kuzat", action: #selector(toggleFollow(_:)), keyEquivalent: "")
+        followItem.target = self
+
+        let noiseItem = sessionMenu.addItem(withTitle: "Shovqinni yashirish", action: #selector(toggleHideNoise(_:)), keyEquivalent: "")
+        noiseItem.target = self
+
+        sessionMenu.addItem(NSMenuItem.separator())
+
+        let harItem = sessionMenu.addItem(withTitle: "HAR saqlash", action: #selector(exportHAR(_:)), keyEquivalent: "e")
+        harItem.target = self
+        harItem.keyEquivalentModifierMask = .command
+
+        let jsonItem = sessionMenu.addItem(withTitle: "JSON saqlash", action: #selector(exportJSON(_:)), keyEquivalent: "")
+        jsonItem.target = self
+
         let windowMenuItem = NSMenuItem()
         mainMenu.addItem(windowMenuItem)
         let windowMenu = NSMenu(title: "Oyna")
@@ -160,6 +177,22 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         }
     }
 
+    @objc func toggleFollow(_ sender: Any?) {
+        MainActor.assumeIsolated { store?.toggleFollowLatest() }
+    }
+
+    @objc func toggleHideNoise(_ sender: Any?) {
+        MainActor.assumeIsolated { store?.toggleHideNoise() }
+    }
+
+    @objc func exportHAR(_ sender: Any?) {
+        MainActor.assumeIsolated { store?.exportHAR() }
+    }
+
+    @objc func exportJSON(_ sender: Any?) {
+        MainActor.assumeIsolated { store?.exportJSON() }
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(togglePause(_:)) {
             let paused = MainActor.assumeIsolated { store?.isPaused == true }
@@ -167,6 +200,14 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         }
         if menuItem.action == #selector(copyCurl(_:)) {
             return MainActor.assumeIsolated { store?.selectedLog != nil }
+        }
+        if menuItem.action == #selector(toggleFollow(_:)) {
+            let on = MainActor.assumeIsolated { store?.followLatest == true }
+            menuItem.state = on ? .on : .off
+        }
+        if menuItem.action == #selector(toggleHideNoise(_:)) {
+            let on = MainActor.assumeIsolated { store?.hideNoise == true }
+            menuItem.state = on ? .on : .off
         }
         return true
     }

@@ -5,9 +5,14 @@ import LogXCore
 enum JSONHighlighter {
     private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
 
-    static func attributedString(for text: String, headers: Bool) -> AttributedString {
+    static func attributedString(
+        for text: String,
+        headers: Bool,
+        highlights: [Range<String.Index>] = [],
+        activeIndex: Int? = nil
+    ) -> AttributedString {
         if text.isEmpty { return AttributedString("") }
-        
+
         let spans: [JSONSpan]
         if headers {
             spans = JSONFormat.highlightHeaders(text)
@@ -21,7 +26,7 @@ enum JSONHighlighter {
                 spans = JSONFormat.highlight(text)
             }
         }
-        
+
         let nsAttr = NSMutableAttributedString()
         for span in spans {
             nsAttr.append(NSAttributedString(
@@ -31,6 +36,17 @@ enum JSONHighlighter {
                     .font: monoFont
                 ]
             ))
+        }
+        if !highlights.isEmpty {
+            let warnBg = NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 0.38)
+            let accentBg = NSColor(srgbRed: 0.388, green: 0.400, blue: 0.945, alpha: 0.28)
+            for (i, range) in highlights.enumerated() {
+                let nsRange = NSRange(range, in: text)
+                guard nsRange.location != NSNotFound,
+                      nsRange.location + nsRange.length <= nsAttr.length else { continue }
+                let active = i == activeIndex
+                nsAttr.addAttribute(.backgroundColor, value: active ? warnBg : accentBg, range: nsRange)
+            }
         }
         return AttributedString(nsAttr)
     }

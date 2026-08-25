@@ -23,6 +23,10 @@ final class LogStore: ObservableObject {
     @Published var isPaused = false
     @Published var selectedMethod: String = "ALL"
     @Published var errorsOnly = false
+    @Published var hideNoise = true
+    @Published var followLatest = false
+    @Published var slowOnly = false
+    @Published var selectedHost: String?
     @Published var lastActivityTs: Double?
     @Published var skippedWhilePaused = 0
     @Published var connection: AppConnection = .booting
@@ -40,10 +44,24 @@ final class LogStore: ObservableObject {
     var apiApps: [AppProfile] = AppProfile.builtIn
     private var detailSeq = DetailSeq()
 
-    private var cachedVisibleLogs: [NetworkLog] = []
-    private var cachedStatusCounts: [StatusClass: Int] = [:]
-    private var cachedErrorCount: Int = 0
-    private var cachedLiveApps: [(app: AppProfile, count: Int)] = []
+    var cachedVisibleLogs: [NetworkLog] = []
+    var cachedStatusCounts: [StatusClass: Int] = [:]
+    var cachedErrorCount: Int = 0
+    var cachedLiveApps: [(app: AppProfile, count: Int)] = []
+    var cachedUniqueHosts: [String] = []
+    var cachedEndpointCounts: [String: Int] = [:]
+
+    init() {
+        let prefs = InspectorPrefs.load()
+        hideNoise = prefs.hideNoise
+        followLatest = prefs.followLatest
+        slowOnly = prefs.slowOnly
+        selectedMethod = prefs.selectedMethod
+        status = StatusClass(rawValue: prefs.status) ?? .all
+        errorsOnly = prefs.errorsOnly
+        selectedAppId = prefs.selectedAppId
+        selectedSerial = prefs.selectedSerial
+    }
 
     var selectedDevice: ConnectedDevice? {
         devices.first(where: { $0.serial == selectedSerial })
@@ -86,6 +104,12 @@ final class LogStore: ObservableObject {
         streamHealthBySerial.values.contains(where: \.isLive)
     }
 
+    var uniqueHosts: [String] { cachedUniqueHosts }
+
+    func repeatCount(for log: NetworkLog) -> Int {
+        cachedEndpointCounts[EndpointIdentity.key(for: log)] ?? 1
+    }
+
     var hasActiveFilter: Bool {
         selectedAppId != "all"
             || status != .all
@@ -93,6 +117,8 @@ final class LogStore: ObservableObject {
             || errorsOnly
             || selectedMethod != "ALL"
             || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || slowOnly
+            || !(selectedHost ?? "").isEmpty
     }
 
     func togglePause() {
@@ -106,6 +132,7 @@ final class LogStore: ObservableObject {
         if errorsOnly { status = .all }
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func clearLogs() {
@@ -153,8 +180,11 @@ final class LogStore: ObservableObject {
         query = ""
         errorsOnly = false
         if favoritesOnly { favoritesOnly = false }
+        slowOnly = false
+        selectedHost = nil
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func refresh(full: Bool = false) async {
@@ -209,6 +239,7 @@ final class LogStore: ObservableObject {
         selectedFieldId = nil
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func selectField(_ id: String?) {
@@ -226,6 +257,7 @@ final class LogStore: ObservableObject {
         favoritesOnly = false
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func toggleFavoritesOnly() {
@@ -248,12 +280,14 @@ final class LogStore: ObservableObject {
         selectedAppId = id
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func selectMethod(_ next: String) {
         selectedMethod = next
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func selectStatus(_ next: StatusClass) {
@@ -261,6 +295,7 @@ final class LogStore: ObservableObject {
         if errorsOnly { errorsOnly = false }
         recomputeDerivedState()
         reconcileSelection()
+        persistPrefs()
     }
 
     func applyQuery(_ next: String) {
@@ -269,7 +304,7 @@ final class LogStore: ObservableObject {
         reconcileSelection()
     }
 
-    private func reconcileSelection() {
+    func reconcileSelection() {
         if let key = selectedKey, visibleLogs.contains(where: { $0.key == key }) {
             if selectedDetail?.key != key || selectedDetail?.isFull != true {
                 Task { await loadDetail(key) }
@@ -287,11 +322,13 @@ final class LogStore: ObservableObject {
     }
 
     func selectLog(_ log: NetworkLog) {
+        followLatest = false
         selectedKey = log.key
+        persistPrefs()
         Task { await loadDetail(log.key) }
     }
 
-    private func loadDetail(_ key: String) async {
+    func loadDetail(_ key: String) async {
         let seq = detailSeq.next()
         let local = liveByKey[key] ?? allLogs.first(where: { $0.key == key })
         if detailSeq.isCurrent(seq) { selectedDetail = local }
@@ -313,60 +350,5 @@ final class LogStore: ObservableObject {
             selectedAppId = "all"
         }
         recomputeDerivedState()
-    }
-
-    func recomputeDerivedState() {
-        var appCounts: [String: Int] = [:]
-        for log in allLogs where LogFilter.isLocal(log) {
-            appCounts[log.resolvedAppId, default: 0] += 1
-        }
-        cachedLiveApps = apps.compactMap { app in
-            guard let count = appCounts[app.id] else { return nil }
-            return (app, count)
-        }
-
-        var counts: [StatusClass: Int] = [
-            .all: 0,
-            .ok2xx: 0,
-            .redirect3xx: 0,
-            .err4xx: 0,
-            .err5xx: 0,
-            .net: 0,
-        ]
-        let scope = selectedScope
-        let q = query
-        let appId = selectedAppId
-        let favsOnly = favoritesOnly
-        let favKeys = favoriteKeys
-
-        for log in allLogs {
-            guard LogFilter.isLocal(log),
-                  LogFilter.matchesApp(log, appId: appId),
-                  LogFilter.matchesDevice(log, scope: scope),
-                  LogFilter.matchesQuery(log, query: q) else { continue }
-            if favsOnly && !favKeys.contains(log.key) { continue }
-
-            counts[.all, default: 0] += 1
-            counts[log.statusClass, default: 0] += 1
-        }
-        cachedStatusCounts = counts
-        cachedErrorCount = (counts[.err4xx] ?? 0) + (counts[.err5xx] ?? 0) + (counts[.net] ?? 0)
-
-        let filtered = LogFilter.apply(
-            allLogs,
-            appId: selectedAppId,
-            scope: selectedScope,
-            status: status,
-            query: query,
-            favoritesOnly: favoritesOnly,
-            favoriteKeys: favoriteKeys,
-            errorsOnly: errorsOnly
-        )
-        if selectedMethod == "ALL" {
-            cachedVisibleLogs = filtered
-        } else {
-            cachedVisibleLogs = filtered.filter { $0.method.uppercased() == selectedMethod }
-        }
-        publishConnection()
     }
 }

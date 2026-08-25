@@ -22,4 +22,15 @@ extension NetworkLog {
         let raw = url.isEmpty ? api : url
         return URL(string: raw)?.host ?? ""
     }
+
+    public var pathOnly: String {
+        let raw = url.isEmpty ? api : url
+        if let parsed = URL(string: raw) {
+            if !parsed.path.isEmpty { return parsed.path }
+        }
+        if let q = raw.firstIndex(of: "?") {
+            return String(raw[..<q])
+        }
+        return raw
+    }
 }
