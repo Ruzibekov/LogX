@@ -11,3 +11,7 @@ Test: `swift test`
 - **REAL test TAQIQ.** Agent REAL-VERIFY / live QA / `qa` spawn / full-qa / desktop-27 / picky live surface qilmaydi.
 - Done = `swift test` exit 0 (+ kerak bo‘lsa fl-verifier). Live sirt — operator yoki boshqa (FL) project.
 - REAL-VERIFY faqat boshqa client projectlar uchun.
+
+## Arxitektura xaritasi (2026-08-31)
+- `Sources/LogX/` — asosiy target · `Sources/LogXCore/` — core target
+- `Tests/` — testlar · `Resources/` — assetlar · `scripts/`, `dist/` — build
