@@ -424,14 +424,15 @@ final class InspectorCompleteTests: XCTestCase {
 
     func testUICopyAndFindSource() throws {
         let list = try source("Sources/LogX/Views/RequestList.swift")
+        let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
         let detail = try source("Sources/LogX/Views/RequestDetail.swift")
         let find = try source("Sources/LogX/Views/DetailFindBar.swift")
         let app = try source("Sources/LogX/LogXApp.swift")
         let content = try source("Sources/LogX/Views/ContentView.swift")
         let row = try source("Sources/LogX/Views/RequestRow.swift")
         let hl = try source("Sources/LogX/Views/JSONHighlighter.swift")
-        XCTAssertTrue(list.contains("Shovqin"), list)
-        XCTAssertTrue(list.contains("Sekin"), list)
+        XCTAssertTrue(filters.contains("Shovqin"), filters)
+        XCTAssertTrue(filters.contains("Sekin"), filters)
         XCTAssertTrue(list.contains("HAR nusxalash"), list)
         XCTAssertTrue(list.contains("Yo'lni nusxalash"), list)
         XCTAssertTrue(find.contains("Topish"), find)

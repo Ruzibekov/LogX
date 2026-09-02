@@ -121,7 +121,9 @@ struct RequestEmptyView: View {
             subtitle: "Jami \(store.allLogs.count) ta jonli — boshqa ulangan qurilma."
         ) {
             Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
                     store.selectAllDevices()
                 }
             } label: {

@@ -18,7 +18,7 @@ struct DeviceRail: View {
                                 isOnline: store.hasLiveStream,
                                 selected: store.selectedSerial == nil && store.selectedFieldId == nil
                             ) {
-                                store.selectAllDevices()
+                                setScope { store.selectAllDevices() }
                             }
 
                             ForEach(store.devices) { device in
@@ -29,7 +29,7 @@ struct DeviceRail: View {
                                     isOnline: store.isStreamLive(serial: device.serial),
                                     selected: store.selectedSerial == device.serial
                                 ) {
-                                    store.selectDevice(device.serial)
+                                    setScope { store.selectDevice(device.serial) }
                                 }
                             }
 
@@ -57,7 +57,7 @@ struct DeviceRail: View {
                                 count: store.allLogs.count,
                                 selected: store.selectedAppId == "all"
                             ) {
-                                store.selectApp("all")
+                                setScope { store.selectApp("all") }
                             }
                             ForEach(store.liveApps, id: \.app.id) { entry in
                                 appRow(
@@ -66,7 +66,7 @@ struct DeviceRail: View {
                                     count: entry.count,
                                     selected: store.selectedAppId == entry.app.id
                                 ) {
-                                    store.selectApp(entry.app.id)
+                                    setScope { store.selectApp(entry.app.id) }
                                 }
                             }
 
@@ -129,8 +129,7 @@ struct DeviceRail: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 12)
             }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             Divider().overlay(LogXTheme.divider)
 
@@ -174,6 +173,12 @@ struct DeviceRail: View {
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.connection)
         }
         .background(LogXTheme.panel)
+    }
+
+    private func setScope(_ work: () -> Void) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction, work)
     }
 
     private var connectionTint: Color {

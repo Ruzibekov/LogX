@@ -3,8 +3,6 @@ import SwiftUI
 import LogXCore
 
 enum JSONHighlighter {
-    private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-
     static func attributedString(
         for text: String,
         headers: Bool,
@@ -27,28 +25,25 @@ enum JSONHighlighter {
             }
         }
 
-        let nsAttr = NSMutableAttributedString()
+        var result = AttributedString()
+        result.font = .system(size: 11.5, design: .monospaced)
         for span in spans {
-            nsAttr.append(NSAttributedString(
-                string: span.text,
-                attributes: [
-                    .foregroundColor: nsColor(span.kind),
-                    .font: monoFont
-                ]
-            ))
+            var piece = AttributedString(span.text)
+            piece.font = .system(size: 11.5, design: .monospaced)
+            piece.foregroundColor = spanColor(span.kind)
+            result.append(piece)
         }
         if !highlights.isEmpty {
-            let warnBg = NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 0.38)
-            let accentBg = NSColor(srgbRed: 0.388, green: 0.400, blue: 0.945, alpha: 0.28)
+            let warnBg = Color(red: 0.961, green: 0.620, blue: 0.043).opacity(0.38)
+            let accentBg = Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.28)
             for (i, range) in highlights.enumerated() {
                 let nsRange = NSRange(range, in: text)
                 guard nsRange.location != NSNotFound,
-                      nsRange.location + nsRange.length <= nsAttr.length else { continue }
-                let active = i == activeIndex
-                nsAttr.addAttribute(.backgroundColor, value: active ? warnBg : accentBg, range: nsRange)
+                      let attrRange = Range<AttributedString.Index>(nsRange, in: result) else { continue }
+                result[attrRange].backgroundColor = i == activeIndex ? warnBg : accentBg
             }
         }
-        return AttributedString(nsAttr)
+        return result
     }
 
     static func nsColor(_ kind: JSONSpanKind) -> NSColor {

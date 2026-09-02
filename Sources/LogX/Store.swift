@@ -277,6 +277,7 @@ final class LogStore: ObservableObject {
     }
 
     func selectApp(_ id: String) {
+        guard selectedAppId != id else { return }
         selectedAppId = id
         recomputeDerivedState()
         reconcileSelection()

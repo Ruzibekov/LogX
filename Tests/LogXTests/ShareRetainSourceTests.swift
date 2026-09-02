@@ -62,28 +62,26 @@ final class ShareRetainSourceTests: XCTestCase {
 
     func testListHeaderContextMenuAndLiveBar() throws {
         let src = try source("Sources/LogX/Views/RequestList.swift")
-        // Ustun sarlavhalari — fixed-slot lane’lar
+        let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
+        let live = try source("Sources/LogX/Views/RequestLiveBar.swift")
         XCTAssertTrue(src.contains("METOD"), src)
         XCTAssertTrue(src.contains("MANZIL"), src)
         XCTAssertTrue(src.contains("QACHON"), src)
         XCTAssertTrue(src.contains("hostLabel"), src)
         XCTAssertTrue(src.contains("RelativeTime.clock"), src)
-        XCTAssertTrue(src.contains("PATCH"), src)
-        XCTAssertTrue(src.contains("Tozalash"), src)
-        XCTAssertTrue(src.contains("skippedWhilePaused"), src)
-        XCTAssertTrue(src.contains("ConnectionDot"), src)
-        // Kontekst menyu — cURL bilan
+        XCTAssertTrue(filters.contains("PATCH"), filters)
+        XCTAssertTrue(filters.contains("Tozalash"), filters)
+        XCTAssertTrue(live.contains("skippedWhilePaused"), live)
+        XCTAssertTrue(live.contains("ConnectionDot"), live)
         XCTAssertTrue(src.contains("URL'ni nusxalash"), src)
         XCTAssertTrue(src.contains("cURL sifatida nusxalash"), src)
-        // Xato-birinchi filtr + live-bar
-        XCTAssertTrue(src.contains("store.errorsOnly"), src)
-        XCTAssertTrue(src.contains("oxirgisi"), src)
-        XCTAssertTrue(src.contains("so'rov"), src)
+        XCTAssertTrue(filters.contains("store.errorsOnly"), filters)
+        XCTAssertTrue(live.contains("oxirgisi"), live)
+        XCTAssertTrue(live.contains("so'rov"), live)
         let empty = try source("Sources/LogX/Views/RequestEmptyView.swift")
         XCTAssertTrue(empty.contains("Filterga mos so'rov yo'q"), empty)
         XCTAssertTrue(src.contains("log.appShortLabel"), src)
-        XCTAssertTrue(src.contains("RelativeTime.label"), src)
-        // Ilova filtri endi sidebar’da — RequestList’da app-chip relka yo’q
+        XCTAssertTrue(live.contains("RelativeTime.label"), live)
         XCTAssertFalse(src.contains("selectApp(\"all\") {\n                    store.selectApp"), src)
         let rail = try source("Sources/LogX/Views/DeviceRail.swift")
         XCTAssertTrue(rail.contains("ILLOVALAR"), rail)
@@ -92,6 +90,6 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertTrue(rail.contains("store.connection.subtitle"), rail)
         XCTAssertTrue(rail.contains("isStreamLive(serial:"), rail)
         XCTAssertFalse(rail.contains("store.serverOK ? \"8787 · jonli\""), rail)
-        XCTAssertTrue(src.contains("store.connection.title"), src)
+        XCTAssertTrue(live.contains("store.connection.title"), live)
     }
 }

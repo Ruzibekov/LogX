@@ -3,18 +3,20 @@ import LogXCore
 
 struct ContentView: View {
     @EnvironmentObject private var store: LogStore
+    @AppStorage("logx.sidebarVisible") private var sidebarVisible = true
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: visibility) {
             DeviceRail()
-                .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 320)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 248, max: 300)
         } content: {
             RequestList()
-                .navigationSplitViewColumnWidth(min: 440, ideal: 660, max: 920)
+                .navigationSplitViewColumnWidth(min: 360, ideal: 560)
         } detail: {
             RequestDetail()
-                .navigationSplitViewColumnWidth(min: 340, ideal: 440, max: 680)
+                .navigationSplitViewColumnWidth(min: 300, ideal: 420)
         }
+        .navigationSplitViewStyle(.balanced)
         .background(LogXTheme.bg)
         .toolbar {
             ToolbarItemGroup(placement: .principal) {
@@ -130,11 +132,20 @@ struct ContentView: View {
                 get: { store.query },
                 set: { store.applyQuery($0) }
             ),
-            prompt: "Host, URL, body, header…"
+            prompt: "Host, URL, body"
         )
         .onExitCommand {
             store.selectedKey = nil
         }
+    }
+
+    private var visibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { sidebarVisible ? .all : .doubleColumn },
+            set: { newValue in
+                sidebarVisible = (newValue != .doubleColumn && newValue != .detailOnly)
+            }
+        )
     }
 
     private var scopeTitle: String {

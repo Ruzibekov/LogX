@@ -57,7 +57,7 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         )
         window.title = "LogX"
         window.contentViewController = hosting
-        window.minSize = NSSize(width: 1100, height: 680)
+        window.minSize = NSSize(width: 960, height: 640)
         window.isReleasedWhenClosed = false
         if !window.setFrameUsingName("LogX.Main") {
             window.setContentSize(NSSize(width: 1440, height: 900))

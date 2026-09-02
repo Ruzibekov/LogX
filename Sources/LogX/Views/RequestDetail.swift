@@ -15,7 +15,6 @@ struct RequestDetail: View {
         Group {
             if let log = store.selectedLog {
                 detail(log)
-                    .transition(.opacity)
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "cursorarrow.click.2")
@@ -28,7 +27,6 @@ struct RequestDetail: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .animation(.easeOut(duration: 0.2), value: store.selectedKey)
         .background(LogXTheme.panel)
     }
 
@@ -91,11 +89,15 @@ struct RequestDetail: View {
             activeIndex: active
         ))
             .textSelection(.enabled)
-            .padding(14)
+            .lineSpacing(2)
+            .padding(.horizontal, 14)
+            .padding(.top, 16)
+            .padding(.bottom, 14)
         if wrapBody {
-            text.frame(maxWidth: .infinity, alignment: .leading)
+            text.frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
             text.fixedSize(horizontal: true, vertical: false)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
@@ -180,11 +182,19 @@ struct RequestDetail: View {
 
     private func actionBar(_ log: NetworkLog) -> some View {
         HStack(spacing: 12) {
-            ActionPillButton(title: "Nusxa", shortcut: "⌘C", isPrimary: true) {
+            ActionPillButton(
+                title: "Nusxa",
+                shortcut: [.symbol("command"), .letter("C")],
+                isPrimary: true
+            ) {
                 copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled))
             }
 
-            ActionPillButton(title: "cURL", shortcut: "⌘⇧C", help: "cURL buyrug'ini nusxalash (⌘⇧C)") {
+            ActionPillButton(
+                title: "cURL",
+                shortcut: [.symbol("command"), .symbol("shift"), .letter("C")],
+                help: "cURL buyrug'ini nusxalash (⌘⇧C)"
+            ) {
                 CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
@@ -199,8 +209,9 @@ struct RequestDetail: View {
                 get: { store.redactEnabled },
                 set: { store.redactEnabled = $0 }
             )) {
-                Text("Yashirish")
+                Text("Tokenlar")
                     .font(.system(size: 10.5, weight: .semibold))
+                    .lineLimit(1)
                     .foregroundStyle(store.redactEnabled ? LogXTheme.accentLight : LogXTheme.muted)
             }
             .toggleStyle(.switch)
@@ -216,7 +227,7 @@ struct RequestDetail: View {
                     store.redactEnabled ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1
                 )
             )
-            .help("Ekran, cURL va ulashishda token yashiriladi")
+            .help("Yoqilsa ekran, cURL va ulashishda token yashiriladi")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -286,7 +297,7 @@ private struct ParamRowView: View {
 
 private struct ActionPillButton: View {
     var title: String
-    var shortcut: String? = nil
+    var shortcut: [ShortcutGlyph.Part]? = nil
     var icon: String? = nil
     var isPrimary: Bool = false
     var help: String? = nil
@@ -302,10 +313,9 @@ private struct ActionPillButton: View {
                 }
                 Text(title)
                     .font(.system(size: 11.5, weight: isPrimary ? .semibold : .medium))
+                    .lineLimit(1)
                 if let shortcut {
-                    Text(shortcut)
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundStyle(LogXTheme.muted2)
+                    ShortcutGlyph(parts: shortcut)
                 }
             }
             .foregroundStyle(hovered ? LogXTheme.text : (isPrimary ? LogXTheme.text : LogXTheme.muted))
@@ -320,7 +330,7 @@ private struct ActionPillButton: View {
                     .stroke(hovered ? LogXTheme.line : Color.clear, lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LogXPressStyle())
         .onHover { hovered = $0 }
         .help(help ?? title)
     }

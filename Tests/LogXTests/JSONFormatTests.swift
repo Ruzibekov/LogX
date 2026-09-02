@@ -14,6 +14,20 @@ final class JSONFormatTests: XCTestCase {
         XCTAssertTrue(aIdx! < zIdx!)
     }
 
+    func testPrettyArrayKeepsOpeningBrackets() {
+        let pretty = JSONFormat.pretty(#"[{"id":"a","lat":1},{"id":"b","lat":2}]"#)
+        XCTAssertTrue(pretty.hasPrefix("["), pretty)
+        XCTAssertTrue(pretty.contains("{"), pretty)
+        let firstId = pretty.range(of: "\"id\"")
+        let firstBrace = pretty.range(of: "{")
+        XCTAssertNotNil(firstId)
+        XCTAssertNotNil(firstBrace)
+        XCTAssertTrue(firstBrace!.lowerBound < firstId!.lowerBound, pretty)
+        let spans = JSONFormat.highlight(pretty)
+        XCTAssertEqual(spans.first?.kind, .punct)
+        XCTAssertTrue(spans.first?.text.contains("[") == true, String(describing: spans.first))
+    }
+
     func testPrettyPassthroughInvalid() {
         XCTAssertEqual(JSONFormat.pretty("not-json"), "not-json")
         XCTAssertEqual(JSONFormat.pretty("   "), "")
