@@ -18,6 +18,10 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .background(LogXTheme.bg)
+        .sheet(item: Binding(get: { store.diffPair }, set: { store.diffPair = $0 })) { pair in
+            DiffView(pair: pair)
+                .environmentObject(store)
+        }
         .toolbar {
             ToolbarItemGroup(placement: .principal) {
                 HStack(spacing: 6) {

@@ -163,6 +163,11 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         add(sessionMenu, "Keyingi xato", #selector(nextError(_:)), "e", .command, target: self)
         add(sessionMenu, "Oldingi xato", #selector(previousError(_:)), "e", [.command, .shift], target: self)
         sessionMenu.addItem(NSMenuItem.separator())
+        add(sessionMenu, "Qayta yuborish", #selector(replaySelected(_:)), "\r", .command, target: self)
+        add(sessionMenu, "Solishtirish uchun belgilash (A)", #selector(toggleDiffAnchor(_:)), "d", .command, target: self)
+        add(sessionMenu, "A bilan solishtirish", #selector(compareWithAnchor(_:)), "d", [.command, .shift], target: self)
+        add(sessionMenu, "Oldingi bir xil so'rov bilan solishtirish", #selector(compareWithPrevious(_:)), "d", [.command, .option], target: self)
+        sessionMenu.addItem(NSMenuItem.separator())
         add(sessionMenu, "Kuzat", #selector(toggleFollow(_:)), "l", .command, target: self)
         add(sessionMenu, "Shovqinni yashirish", #selector(toggleHideNoise(_:)), "n", [.command, .option], target: self)
 
@@ -209,6 +214,10 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
     @objc func nextError(_ sender: Any?) { store?.moveToError(forward: true) }
     @objc func previousError(_ sender: Any?) { store?.moveToError(forward: false) }
     @objc func toggleHideNoise(_ sender: Any?) { store?.toggleHideNoise() }
+    @objc func replaySelected(_ sender: Any?) { store?.replaySelected() }
+    @objc func toggleDiffAnchor(_ sender: Any?) { store?.toggleDiffAnchorSelected() }
+    @objc func compareWithAnchor(_ sender: Any?) { store?.compareSelectedWithAnchor() }
+    @objc func compareWithPrevious(_ sender: Any?) { store?.compareSelectedWithPrevious() }
     @objc func exportHAR(_ sender: Any?) { store?.exportHAR() }
     @objc func exportJSON(_ sender: Any?) { store?.exportJSON() }
 
@@ -238,6 +247,16 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
             menuItem.title = store.isPaused ? "Davom ettirish" : "Pauza"
         case #selector(copyCurl(_:)), #selector(copyBody(_:)), #selector(focusDetailFind(_:)):
             return store.selectedLog != nil
+        case #selector(replaySelected(_:)):
+            return store.selectedLog.map { store.canReplay($0) } ?? false
+        case #selector(toggleDiffAnchor(_:)):
+            menuItem.title = store.selectedLog != nil && store.diffAnchorKey == store.selectedKey
+                ? "A belgisini olib tashlash" : "Solishtirish uchun belgilash (A)"
+            return store.selectedLog != nil
+        case #selector(compareWithAnchor(_:)):
+            return store.canCompareWithAnchor
+        case #selector(compareWithPrevious(_:)):
+            return store.canCompareSelectedWithPrevious
         case #selector(exportHAR(_:)), #selector(exportJSON(_:)):
             return store.canExport
         case #selector(nextError(_:)), #selector(previousError(_:)):

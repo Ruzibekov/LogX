@@ -3,7 +3,7 @@ import Foundation
 /// NetworkLog'dan ijroga tayyor curl buyrug'ini yig'adi.
 public enum CurlBuilder {
     /// curl o'zi hisoblaydigan yoki replay'da zarar keltiradigan sarlavhalar.
-    static let droppedHeaders: Set<String> = [
+    public static let droppedHeaders: Set<String> = [
         "content-length", "accept-encoding", "host", "connection", "transfer-encoding",
     ]
 
@@ -44,7 +44,7 @@ public enum CurlBuilder {
 
     /// OkHttp logger tanani yozmasa `(binary 812-byte body omitted)` kabi izoh qoldiradi —
     /// bu tana emas, uni yuborish mumkin emas.
-    static func isOmittedBody(_ body: String) -> Bool {
+    public static func isOmittedBody(_ body: String) -> Bool {
         let t = body.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.hasPrefix("(") && t.hasSuffix(")") && t.lowercased().contains("body omitted")
     }

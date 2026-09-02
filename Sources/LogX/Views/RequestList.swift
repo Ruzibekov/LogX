@@ -150,6 +150,17 @@ struct RequestList: View {
             Button(store.selectedHost == log.hostLabel ? "Host filtrini olib tashlash" : "Faqat shu host") { store.selectHost(log.hostLabel) }
         }
         Divider()
+        Button("Qayta yuborish") { store.replay(log) }
+            .disabled(!store.canReplay(log))
+        Divider()
+        Button(store.diffAnchorKey == log.key ? "A belgisini olib tashlash" : "Solishtirish uchun belgilash (A)") { store.toggleDiffAnchor(log) }
+        if let anchor = store.diffAnchor, anchor.key != log.key {
+            Button("A bilan solishtirish · \(anchor.method) \(anchor.pathOnly)") { store.compareWithAnchor(log) }
+        }
+        if store.previousSameEndpoint(of: log) != nil {
+            Button("Oldingi bir xil so'rov bilan solishtirish") { store.compareWithPrevious(log) }
+        }
+        Divider()
         Button("URL'ni nusxalash") { store.copy(store.shareableURL(log), what: "URL") }
         Button("Qatorni nusxalash") {
             store.copy("\(log.method) \(log.hostLabel) \(store.displayPath(log)) \(log.appShortLabel) \(RelativeTime.clock(ts: log.ts))", what: "qator")

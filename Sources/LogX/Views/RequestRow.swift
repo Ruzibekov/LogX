@@ -66,6 +66,29 @@ struct RequestRow: View {
                         .accessibilityLabel("Shu endpointni filtrlash")
                     }
 
+                    if store.diffAnchorKey == log.key {
+                        Text("A")
+                            .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(LogXTheme.err)
+                            .padding(.horizontal, 4.5)
+                            .padding(.vertical, 1.5)
+                            .background(LogXTheme.err.opacity(0.14), in: RoundedRectangle(cornerRadius: 3.5))
+                            .overlay(RoundedRectangle(cornerRadius: 3.5).stroke(LogXTheme.err.opacity(0.4), lineWidth: 1))
+                            .help("Solishtirish uchun belgilangan — boshqa so'rovda ⇧⌘D")
+                    }
+
+                    if Replay.isReplay(log) {
+                        Text("REPLAY")
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(0.6)
+                            .foregroundStyle(LogXTheme.accentLight)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1.5)
+                            .background(LogXTheme.chipOn, in: RoundedRectangle(cornerRadius: 3.5))
+                            .overlay(RoundedRectangle(cornerRadius: 3.5).stroke(LogXTheme.chipOnEdge, lineWidth: 1))
+                            .help("Mac'dan qayta yuborilgan so'rov")
+                    }
+
                     if RelativeTime.isFresh(ts: log.ts, now: now) {
                         Text("YANGI")
                             .font(.system(size: 9, weight: .heavy))

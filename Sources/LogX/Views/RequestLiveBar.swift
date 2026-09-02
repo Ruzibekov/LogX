@@ -20,6 +20,8 @@ struct RequestLiveBar: View {
                 ShortcutGlyph(parts: [.symbol("chevron.up.chevron.down")]).help("↑↓ — so'rovlar bo'ylab yurish")
                 ShortcutGlyph(parts: [.symbol("command"), .letter("E")]).help("⌘E — keyingi xato, ⇧⌘E — oldingi")
                 ShortcutGlyph(parts: [.symbol("command"), .letter("F")]).help("⌘F — so'rovlarni qidirish, ↓ ro'yxatga o'tadi")
+                ShortcutGlyph(parts: [.symbol("command"), .symbol("return")]).help("⌘⏎ — tanlangan so'rovni qayta yuborish")
+                ShortcutGlyph(parts: [.symbol("command"), .letter("D")]).help("⌘D — A deb belgilash, ⇧⌘D — A bilan solishtirish, ⌥⌘D — oldingi bir xil so'rov bilan")
                 ShortcutGlyph(parts: [.symbol("command"), .letter("P")]).help("⌘P — pauza / davom")
                 ShortcutGlyph(parts: [.symbol("command"), .symbol("shift"), .letter("C")]).help("⌘⇧C — cURL nusxalash")
                 ShortcutGlyph(parts: [.symbol("command"), .letter("K")]).help("⌘K — tozalash, ⌥⌘K — bekor qilish")

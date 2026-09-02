@@ -10,6 +10,9 @@ struct RequestDetail: View {
     /// Default: uzun qator o'ralmaydi — gorizontal aylanma; «O'rash» ixtiyoriy.
     @AppStorage("logx.wrapBody") private var wrapBody = false
     @AppStorage("logx.prettyBody") private var prettyBody = true
+    /// JSON tanani yig'iladigan daraxt sifatida ko'rsatish (faqat so'rov/javob tabida).
+    @AppStorage("logx.treeBody") private var treeBody = false
+    @State private var treeMatchCount = 0
     @StateObject private var shareHost = SharePickerHost()
     @State private var bodyCache: RenderedBody?
 
@@ -37,14 +40,18 @@ struct RequestDetail: View {
         .background(LogXTheme.panel)
     }
 
+    /// Daraxt rejimida topish so'rovi kalitga kirmaydi — har harfda daraxt qayta
+    /// qurilmaydi, yig'ilgan/yoyilgan holat va scroll saqlanadi.
     private func renderKey(_ log: NetworkLog) -> RenderedBody.Key {
-        RenderedBody.Key(
+        let tree = treeBody && (tab == .request || tab == .response)
+        return RenderedBody.Key(
             logKey: log.key,
             tab: tab,
             redact: store.redactEnabled,
             pretty: prettyBody,
-            query: findQuery,
-            index: findIndex
+            query: tree ? "" : findQuery,
+            index: tree ? 0 : findIndex,
+            tree: tree
         )
     }
 
@@ -58,9 +65,9 @@ struct RequestDetail: View {
                 hiddenBanner
             }
             Divider().overlay(LogXTheme.divider)
-            tabBar(log: log)
+            tabBar(log: log, treeAvailable: rendered.map { $0.tree != nil })
             Divider().overlay(LogXTheme.divider)
-            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.matchCount ?? 0)
+            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : (rendered?.matchCount ?? 0))
             Divider().overlay(LogXTheme.divider)
             Group {
                 if tab == .params && !params.isEmpty && findQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -70,6 +77,11 @@ struct RequestDetail: View {
                             .background(bodyWell)
                             .padding(10)
                     }
+                } else if let rendered, let tree = rendered.tree {
+                    JSONTreeView(tree: tree, query: findQuery, activeIndex: findIndex) { treeMatchCount = $0 }
+                        .id(tree.identity)
+                        .background(bodyWell)
+                        .padding(10)
                 } else if let rendered {
                     VStack(spacing: 0) {
                         if let notice = rendered.truncationNotice {
@@ -170,7 +182,7 @@ struct RequestDetail: View {
         }
     }
 
-    private func tabBar(log: NetworkLog) -> some View {
+    private func tabBar(log: NetworkLog, treeAvailable: Bool?) -> some View {
         HStack(spacing: 5) {
             ForEach(DetailTab.allCases, id: \.self) { item in
                 Button {
@@ -207,6 +219,20 @@ struct RequestDetail: View {
             Spacer()
             if tab == .request || tab == .response {
                 togglePill(
+                    on: treeBody,
+                    icon: "list.bullet.indent",
+                    title: "Daraxt",
+                    help: treeBody
+                        ? (treeAvailable == false ? "Tana JSON emas yoki \(JSONTree.nodeLimit) tugundan katta — matn ko'rsatilmoqda; bosilsa daraxt o'chadi" : "Matn ko'rinishiga qaytish")
+                        : "JSON'ni yig'iladigan daraxt sifatida ko'rsatish (⌥-bosish butun shoxni yig'adi)",
+                    label: "JSON daraxti"
+                ) {
+                    treeBody.toggle()
+                }
+            }
+            if treeAvailable != true {
+                if tab == .request || tab == .response {
+                togglePill(
                     on: !prettyBody,
                     icon: "chevron.left.forwardslash.chevron.right",
                     title: "Raw",
@@ -215,7 +241,7 @@ struct RequestDetail: View {
                 ) {
                     prettyBody.toggle()
                 }
-            }
+                }
             togglePill(
                 on: wrapBody,
                 icon: wrapBody ? "text.alignleft" : "arrow.left.and.right",
@@ -224,6 +250,7 @@ struct RequestDetail: View {
                 label: "Qator o'rash"
             ) {
                 wrapBody.toggle()
+            }
             }
         }
         .padding(.horizontal, 10)
@@ -284,7 +311,17 @@ struct RequestDetail: View {
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
 
-            ActionPillButton(title: "Ulashish", icon: "square.and.arrow.up", help: "Rasm sifatida ulashish") {
+            ActionPillButton(
+                title: store.selectedIsReplaying ? "Yuborilmoqda…" : "Qayta yuborish",
+                icon: "arrow.clockwise",
+                help: store.replayBlocker(log) ?? "So'rovni Mac'dan qayta yuborish — javob ro'yxatga REPLAY bo'lib tushadi (⌘⏎)"
+            ) {
+                store.replay(log)
+            }
+            .disabled(!store.canReplay(log))
+            .keyboardShortcut(.return, modifiers: .command)
+
+            ActionPillButton(title: "", icon: "square.and.arrow.up", help: "Rasm sifatida ulashish", label: "Ulashish") {
                 share(log)
             }
 
@@ -357,6 +394,7 @@ struct RenderedBody {
         var pretty: Bool
         var query: String
         var index: Int
+        var tree: Bool
     }
 
     /// Shundan katta tana ekranda qisqartiriladi (nusxa to'liq qoladi) — NSTextView
@@ -369,8 +407,15 @@ struct RenderedBody {
     var matchCount: Int
     var activeRange: NSRange?
     var truncationNotice: String?
+    var tree: JSONTree?
 
     static func make(log: NetworkLog, key: Key) -> RenderedBody {
+        if key.tree, key.tab == .request || key.tab == .response {
+            let source = JSONFormat.body(for: log, tab: key.tab, redact: key.redact, pretty: true)
+            if let tree = JSONTree(text: source, identity: "\(log.key)|\(key.tab.rawValue)|\(key.redact)") {
+                return RenderedBody(key: key, text: source, attributed: NSAttributedString(), matchCount: 0, activeRange: nil, truncationNotice: nil, tree: tree)
+            }
+        }
         let body = JSONFormat.body(for: log, tab: key.tab, redact: key.redact, pretty: key.pretty)
         var display = body.isEmpty ? "—" : body
         var notice: String?
@@ -545,6 +590,7 @@ private struct ActionPillButton: View {
     var icon: String? = nil
     var isPrimary: Bool = false
     var help: String? = nil
+    var label: String? = nil
     var action: () -> Void
     @State private var hovered = false
 
@@ -555,9 +601,11 @@ private struct ActionPillButton: View {
                     Image(systemName: icon)
                         .font(.system(size: 10.5))
                 }
-                Text(title)
-                    .font(.system(size: 11.5, weight: isPrimary ? .semibold : .medium))
-                    .lineLimit(1)
+                if !title.isEmpty {
+                    Text(title)
+                        .font(.system(size: 11.5, weight: isPrimary ? .semibold : .medium))
+                        .lineLimit(1)
+                }
                 if let shortcut {
                     ShortcutGlyph(parts: shortcut)
                 }
@@ -577,6 +625,7 @@ private struct ActionPillButton: View {
         .buttonStyle(LogXPressStyle())
         .onHover { hovered = $0 }
         .help(help ?? title)
+        .accessibilityLabel(label ?? title)
     }
 }
 

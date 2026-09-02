@@ -34,6 +34,11 @@ final class LogStore: ObservableObject {
     @Published var selectedIsHidden = false
     /// Qisqa xabar (nusxalandi, tozalandi…) — ixtiyoriy amal tugmasi bilan.
     @Published var toast: Toast?
+    @Published var replayInFlight: Set<String> = []
+    @Published var diffAnchorKey: String?
+    @Published var diffPair: DiffPair?
+    var replayPerformer: (NetworkLog) async -> ReplayResult = { await Replay.perform($0) }
+    var replayConfirm: (NetworkLog) -> Bool = LogStore.confirmMutatingReplay
     var toastTask: Task<Void, Never>?
     /// Pidlar noma'lum bo'lib qolgan streak — server pid xaritasi eskirgan (ilova qayta ochilgan).
     var unknownAppStreak: [String: Int] = [:]
@@ -494,4 +499,12 @@ struct Toast: Identifiable, Equatable {
     var action: (() -> Void)?
 
     static func == (lhs: Toast, rhs: Toast) -> Bool { lhs.id == rhs.id }
+}
+
+/// Solishtirish oynasi uchun juftlik: A — belgilangan (eski), B — joriy.
+struct DiffPair: Identifiable, Equatable {
+    var a: NetworkLog
+    var b: NetworkLog
+
+    var id: String { a.key + "|" + b.key }
 }
