@@ -7,7 +7,8 @@ struct RequestDetail: View {
     @State private var copied = false
     @State private var findQuery = ""
     @State private var findIndex = 0
-    @AppStorage("logx.wrapBody") private var wrapBody = true
+    /// Default: uzun qator o'ralmaydi — gorizontal aylanma; «O'rash» ixtiyoriy.
+    @AppStorage("logx.wrapBody") private var wrapBody = false
     @AppStorage("logx.prettyBody") private var prettyBody = true
     @StateObject private var shareHost = SharePickerHost()
     @State private var bodyCache: RenderedBody?
@@ -443,14 +444,18 @@ struct BodyTextView: NSViewRepresentable {
                 container.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
                 textView.isHorizontallyResizable = false
                 textView.autoresizingMask = [.width]
+                textView.setFrameSize(NSSize(width: scroll.contentSize.width, height: textView.frame.height))
                 scroll.hasHorizontalScroller = false
             } else {
                 container.widthTracksTextView = false
                 container.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+                container.lineBreakMode = .byClipping
                 textView.isHorizontallyResizable = true
                 textView.autoresizingMask = []
                 scroll.hasHorizontalScroller = true
             }
+            textView.layoutManager?.ensureLayout(for: container)
+            textView.sizeToFit()
         }
         if coord.lastText !== text {
             coord.lastText = text

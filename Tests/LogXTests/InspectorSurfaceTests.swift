@@ -39,6 +39,8 @@ final class InspectorSurfaceTests: XCTestCase {
         let detail = try source("Sources/LogX/Views/RequestDetail.swift")
         XCTAssertTrue(detail.contains("BodyTextView"), detail)
         XCTAssertTrue(detail.contains("scrollRangeToVisible"), detail)
+        XCTAssertTrue(detail.contains("@AppStorage(\"logx.wrapBody\") private var wrapBody = false"), "long lines scroll horizontally by default")
+        XCTAssertTrue(detail.contains("lineBreakMode = .byClipping"), detail)
         XCTAssertTrue(detail.contains("Tokenlar"), detail)
         XCTAssertFalse(detail.contains("Yashirish"), detail)
     }
