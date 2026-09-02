@@ -87,7 +87,7 @@ struct RequestFilterBar: View {
                 .fill(LogXTheme.well)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(searchFocused ? LogXTheme.accent.opacity(0.6) : LogXTheme.line, lineWidth: 1)
+                        .stroke(searchFocused ? LogXTheme.focusRing : LogXTheme.line, lineWidth: 1)
                 )
         )
     }
@@ -175,12 +175,12 @@ struct RequestFilterBar: View {
         } label: {
             Text(method == "ALL" ? "Hammasi" : method)
                 .font(.system(size: 10, weight: store.selectedMethod == method ? .bold : .medium, design: .monospaced))
-                .foregroundStyle(store.selectedMethod == method ? (method == "ALL" ? LogXTheme.text : LogXTheme.methodColor(method)) : LogXTheme.muted2)
+                .foregroundStyle(store.selectedMethod == method ? LogXTheme.text : LogXTheme.muted2)
                 .lineLimit(1)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(RoundedRectangle(cornerRadius: 4.5).fill(store.selectedMethod == method ? LogXTheme.panel2 : Color.clear))
-                .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(store.selectedMethod == method ? LogXTheme.line : Color.clear, lineWidth: 1))
+                .background(RoundedRectangle(cornerRadius: 4.5).fill(store.selectedMethod == method ? LogXTheme.chipOn : Color.clear))
+                .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(store.selectedMethod == method ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1))
                 .fixedSize()
         }
         .buttonStyle(LogXPressStyle())
@@ -198,8 +198,8 @@ struct RequestFilterBar: View {
                 .lineLimit(1)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Capsule().fill(store.hideNoise ? LogXTheme.accent.opacity(0.16) : Color.clear))
-                .overlay(Capsule().stroke(store.hideNoise ? LogXTheme.accent.opacity(0.4) : LogXTheme.line, lineWidth: 1))
+                .background(Capsule().fill(store.hideNoise ? LogXTheme.chipOn : Color.clear))
+                .overlay(Capsule().stroke(store.hideNoise ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1))
                 .fixedSize()
         }
         .buttonStyle(LogXPressStyle())
@@ -239,8 +239,8 @@ struct RequestFilterBar: View {
                 .lineLimit(1)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Capsule().fill(active ? LogXTheme.accent.opacity(0.18) : Color.clear))
-                .overlay(Capsule().stroke(active ? LogXTheme.accent.opacity(0.45) : LogXTheme.line, lineWidth: 1))
+                .background(Capsule().fill(active ? LogXTheme.chipOn : Color.clear))
+                .overlay(Capsule().stroke(active ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1))
         }
         .buttonStyle(LogXPressStyle())
         .help(host)
@@ -261,8 +261,8 @@ struct RequestFilterBar: View {
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 4.5).fill(store.errorsOnly ? LogXTheme.err.opacity(0.2) : (store.errorCount > 0 ? LogXTheme.err.opacity(0.08) : Color.clear)))
-            .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(store.errorsOnly ? LogXTheme.err.opacity(0.7) : Color.clear, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 4.5).fill(store.errorsOnly ? LogXTheme.err.opacity(0.14) : (store.errorCount > 0 ? LogXTheme.err.opacity(0.08) : Color.clear)))
+            .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(store.errorsOnly ? LogXTheme.err.opacity(0.45) : Color.clear, lineWidth: 1))
             .foregroundStyle(store.errorsOnly || store.errorCount > 0 ? LogXTheme.err : LogXTheme.muted)
             .fixedSize()
         }
@@ -287,8 +287,8 @@ struct RequestFilterBar: View {
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 4.5).fill(active ? (color == LogXTheme.text ? LogXTheme.accent.opacity(0.18) : color.opacity(0.15)) : Color.clear))
-            .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(active ? (color == LogXTheme.text ? LogXTheme.accent.opacity(0.5) : color.opacity(0.4)) : Color.clear, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 4.5).fill(active ? (color == LogXTheme.text ? LogXTheme.chipOn : color.opacity(0.12)) : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(active ? (color == LogXTheme.text ? LogXTheme.chipOnEdge : color.opacity(0.35)) : Color.clear, lineWidth: 1))
             .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
             .fixedSize()
         }

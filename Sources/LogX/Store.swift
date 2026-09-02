@@ -387,6 +387,20 @@ final class LogStore: ObservableObject {
         selectedIsHidden = !cachedVisibleKeys.contains(key)
     }
 
+    /// ↑/↓: ko'rinadigan ro'yxat bo'ylab yuradi; tanlov yo'q bo'lsa chetidan boshlaydi.
+    func moveSelection(by delta: Int) {
+        let logs = visibleLogs
+        guard !logs.isEmpty else { return }
+        let current = selectedKey.flatMap { key in logs.firstIndex(where: { $0.key == key }) }
+        let next: Int
+        if let current {
+            next = min(max(current + delta, 0), logs.count - 1)
+        } else {
+            next = delta < 0 ? logs.count - 1 : 0
+        }
+        selectLog(logs[next])
+    }
+
     func selectLog(_ log: NetworkLog) {
         if followLatest {
             followLatest = false

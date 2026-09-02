@@ -126,3 +126,93 @@ final class StoreBehaviorTests: XCTestCase {
         XCTAssertFalse(store.favoriteKeys.contains("a"), "favorites are stored hashed")
     }
 }
+
+final class ThemeAndSelectionTests: XCTestCase {
+    private func source(_ rel: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(rel), encoding: .utf8)
+    }
+
+    func testListDoesNotUseNativeSelectionHighlight() throws {
+        let list = try source("Sources/LogX/Views/RequestList.swift")
+        XCTAssertFalse(list.contains("selection: Binding"), list)
+        XCTAssertTrue(list.contains("listRowBackground(Color.clear)"), list)
+        XCTAssertTrue(list.contains("onKeyPress(.upArrow)"), list)
+        XCTAssertTrue(list.contains("onKeyPress(.downArrow)"), list)
+        XCTAssertTrue(list.contains("proxy.scrollTo(key"), list)
+        let row = try source("Sources/LogX/Views/RequestRow.swift")
+        XCTAssertTrue(row.contains("onTapGesture { store.selectLog(log) }"), row)
+        XCTAssertTrue(row.contains("LogXTheme.selection"), row)
+    }
+
+    func testMethodChipsAreMonochrome() throws {
+        let theme = try source("Sources/LogX/Theme.swift")
+        XCTAssertFalse(theme.contains("#A855F7"), theme)
+        XCTAssertTrue(theme.contains("case \"DELETE\": return err"), theme)
+        for f in ["Sources/LogX/Views/RequestRow.swift", "Sources/LogX/Views/DetailHeader.swift", "Sources/LogX/Views/RequestFilterBar.swift"] {
+            let s = try source(f)
+            XCTAssertFalse(s.contains("methodColor(log.method).opacity"), f)
+            XCTAssertFalse(s.contains("methodColor(method)"), f)
+        }
+    }
+
+    func testSingleAccentLanguageAcrossViews() throws {
+        for f in ["RequestDetail", "DetailFindBar", "DeviceRail", "ContentView", "RequestFilterBar"] {
+            let s = try source("Sources/LogX/Views/\(f).swift")
+            XCTAssertFalse(s.contains("accent.opacity("), f)
+            XCTAssertTrue(s.contains("LogXTheme.chipOn"), f)
+        }
+        for f in ["RequestRow", "RequestEmptyView", "DetailHeader"] {
+            let s = try source("Sources/LogX/Views/\(f).swift")
+            XCTAssertFalse(s.contains("accent.opacity("), f)
+        }
+        let share = try source("Sources/LogX/ShareCardRenderer.swift")
+        XCTAssertFalse(share.contains("0.388, green: 0.400, blue: 0.945"), "share card must use the app palette")
+        XCTAssertTrue(share.contains("0.357, green: 0.553, blue: 0.937"), share)
+        let theme = try source("Sources/LogX/Theme.swift")
+        XCTAssertTrue(theme.contains("case .redirect3xx: return text2"), "3xx must not borrow the interactive accent")
+    }
+
+    func testListKeyboardAndFollowScrollGuards() throws {
+        let list = try source("Sources/LogX/Views/RequestList.swift")
+        XCTAssertTrue(list.contains("onMoveCommand"), list)
+        XCTAssertTrue(list.contains("guard !store.followLatest"), "follow mode must not scroll-jump on every batch")
+        XCTAssertTrue(list.contains("listFocused = true"), list)
+        let row = try source("Sources/LogX/Views/RequestRow.swift")
+        XCTAssertTrue(row.contains(".isSelected"), row)
+    }
+
+    @MainActor
+    func testMoveSelectionWalksVisibleListAndClamps() {
+        let store = LogStore()
+        store.hideNoise = true
+        store.followLatest = false
+        store.slowOnly = false
+        store.errorsOnly = false
+        store.favoritesOnly = false
+        store.favoriteKeys = []
+        store.status = .all
+        store.selectedMethod = "ALL"
+        store.selectedAppId = "all"
+        store.selectedSerial = nil
+        store.selectedHost = nil
+        store.query = ""
+        store.isPaused = false
+        store.ingestBatch((0..<3).map { i in
+            NetworkLog(key: "k\(i)", method: "GET", url: "https://api.example.uz/p\(i)", responseCode: 200, packageName: "uz.test.app", source: "logcat", serial: "A", ts: 1_000 + Double(i))
+        })
+        XCTAssertEqual(store.visibleLogs.count, 3)
+        XCTAssertNil(store.selectedKey)
+        store.moveSelection(by: 1)
+        XCTAssertEqual(store.selectedKey, store.visibleLogs[0].key)
+        store.moveSelection(by: 1)
+        XCTAssertEqual(store.selectedKey, store.visibleLogs[1].key)
+        store.moveSelection(by: 5)
+        XCTAssertEqual(store.selectedKey, store.visibleLogs[2].key)
+        store.moveSelection(by: -10)
+        XCTAssertEqual(store.selectedKey, store.visibleLogs[0].key)
+        store.clearSelection()
+        store.moveSelection(by: -1)
+        XCTAssertEqual(store.selectedKey, store.visibleLogs[2].key, "↑ without selection starts from the bottom")
+    }
+}

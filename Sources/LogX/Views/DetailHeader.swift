@@ -18,11 +18,11 @@ struct DetailHeader: View {
                     .padding(.vertical, 3)
                     .background(
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(LogXTheme.methodColor(log.method).opacity(0.18))
+                            .fill(LogXTheme.panel2)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(LogXTheme.methodColor(log.method).opacity(0.35), lineWidth: 1)
+                            .stroke(LogXTheme.line, lineWidth: 1)
                     )
 
                 HStack(spacing: 5) {
@@ -34,7 +34,7 @@ struct DetailHeader: View {
                         .foregroundStyle(LogXTheme.status(log.statusClass))
                     Text(log.statusDescription)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(LogXTheme.status(log.statusClass).opacity(0.95))
+                        .foregroundStyle(LogXTheme.status(log.statusClass))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
@@ -251,7 +251,7 @@ private struct HeaderIconButton: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(isHighlighted ? highlightColor.opacity(0.5) : (hovered ? LogXTheme.accent.opacity(0.4) : LogXTheme.line), lineWidth: 1)
+                        .stroke(isHighlighted ? highlightColor.opacity(0.5) : (hovered ? LogXTheme.chipOnEdge : LogXTheme.line), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

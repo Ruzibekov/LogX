@@ -75,11 +75,11 @@ struct ContentView: View {
                         .frame(width: 26, height: 26)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(store.followLatest ? LogXTheme.accent.opacity(0.18) : LogXTheme.well)
+                                .fill(store.followLatest ? LogXTheme.chipOn : LogXTheme.well)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(store.followLatest ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1)
+                                .stroke(store.followLatest ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)

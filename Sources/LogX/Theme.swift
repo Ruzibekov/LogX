@@ -2,34 +2,38 @@ import SwiftUI
 import LogXCore
 
 enum LogXTheme {
-    static let bg = Color(red: 0.043, green: 0.051, blue: 0.078)
-    static let panel = Color(red: 0.059, green: 0.071, blue: 0.110)
-    static let panel2 = Color(red: 0.086, green: 0.106, blue: 0.157)
-    static let well = Color(red: 0.047, green: 0.059, blue: 0.090)
-    static let line = Color(red: 0.165, green: 0.200, blue: 0.275)
-    static let divider = Color(red: 0.118, green: 0.141, blue: 0.196)
+    static let bg = Color(red: 0.059, green: 0.063, blue: 0.071)      // #0F1012
+    static let panel = Color(red: 0.082, green: 0.086, blue: 0.098)   // #151619
+    static let panel2 = Color(red: 0.110, green: 0.118, blue: 0.133)  // #1C1E22
+    static let well = Color(red: 0.071, green: 0.075, blue: 0.086)    // #121316
+    static let line = Color(red: 0.169, green: 0.180, blue: 0.204)    // #2B2E34
+    static let divider = Color(red: 0.125, green: 0.133, blue: 0.149) // #202226
 
-    static let text = Color(red: 0.973, green: 0.980, blue: 0.988)
-    static let text2 = Color(red: 0.796, green: 0.835, blue: 0.882)
-    static let muted = Color(red: 0.580, green: 0.639, blue: 0.722)
-    static let muted2 = Color(red: 0.470, green: 0.530, blue: 0.620)
+    static let text = Color(red: 0.949, green: 0.953, blue: 0.961)    // #F2F3F5
+    static let text2 = Color(red: 0.788, green: 0.800, blue: 0.824)   // #C9CCD2
+    static let muted = Color(red: 0.549, green: 0.569, blue: 0.604)   // #8C919A
+    static let muted2 = Color(red: 0.541, green: 0.561, blue: 0.600)  // #8A8F99 (AA 5.8:1 on bg)
 
-    static let accent = Color(red: 0.388, green: 0.400, blue: 0.945)
-    static let accentLight = Color(red: 0.506, green: 0.549, blue: 0.973) // #818CF8
-    static let ok = Color(red: 0.063, green: 0.725, blue: 0.506)
-    static let warn = Color(red: 0.961, green: 0.620, blue: 0.043)
-    static let err = Color(red: 0.957, green: 0.247, blue: 0.369)
-    static let method = Color(red: 0.220, green: 0.741, blue: 0.973)
-    static let net = Color(red: 0.392, green: 0.455, blue: 0.545)
+    static let accent = Color(red: 0.357, green: 0.553, blue: 0.937)      // #5B8DEF
+    static let accentLight = Color(red: 0.541, green: 0.690, blue: 0.961) // #8AB0F5
+    static let ok = Color(red: 0.239, green: 0.745, blue: 0.478)          // #3DBE7A
+    static let warn = Color(red: 0.878, green: 0.651, blue: 0.231)        // #E0A63B
+    static let err = Color(red: 0.933, green: 0.416, blue: 0.439)         // #EE6A70 (AA on 20% tint)
+    static let method = accentLight
+    static let net = muted
 
+    static let selection = accent.opacity(0.14)
+    static let selectionEdge = accent.opacity(0.35)
+    static let chipOn = accent.opacity(0.16)
+    static let chipOnEdge = accent.opacity(0.45)
+    static let focusRing = accent.opacity(0.6)
+    static let glow = accent.opacity(0.22)
+
+    /// Metod rang bilan emas, vazn bilan ajratiladi; faqat DELETE ogohlantiradi.
     static func methodColor(_ method: String) -> Color {
         switch method.uppercased() {
-        case "GET": return Color(red: 0.220, green: 0.741, blue: 0.973)
-        case "POST": return Color(red: 0.063, green: 0.725, blue: 0.506)
-        case "PUT": return Color(red: 0.961, green: 0.620, blue: 0.043)
-        case "PATCH": return Color(red: 0.918, green: 0.702, blue: 0.031)
-        case "DELETE": return Color(red: 0.957, green: 0.247, blue: 0.369)
-        case "HEAD", "OPTIONS": return Color(red: 0.659, green: 0.333, blue: 0.969) // #A855F7
+        case "DELETE": return err
+        case "GET", "POST", "PUT", "PATCH", "HEAD", "OPTIONS": return text2
         default: return muted
         }
     }
@@ -37,7 +41,7 @@ enum LogXTheme {
     static func status(_ cls: LogXCore.StatusClass) -> Color {
         switch cls {
         case .ok2xx: return ok
-        case .redirect3xx: return method
+        case .redirect3xx: return text2
         case .err4xx: return warn
         case .err5xx: return err
         case .net: return net

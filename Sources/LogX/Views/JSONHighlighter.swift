@@ -34,8 +34,8 @@ enum JSONHighlighter {
             result.append(piece)
         }
         if !highlights.isEmpty {
-            let warnBg = Color(red: 0.961, green: 0.620, blue: 0.043).opacity(0.38)
-            let accentBg = Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.28)
+            let warnBg = LogXTheme.warn.opacity(0.42)
+            let accentBg = LogXTheme.accent.opacity(0.26)
             for (i, range) in highlights.enumerated() {
                 let nsRange = NSRange(range, in: text)
                 guard nsRange.location != NSNotFound,
@@ -76,8 +76,8 @@ enum JSONHighlighter {
         }
         var active: NSRange?
         if !highlights.isEmpty {
-            let warnBg = NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 0.38)
-            let accentBg = NSColor(srgbRed: 0.388, green: 0.400, blue: 0.945, alpha: 0.28)
+            let warnBg = NSColor(srgbRed: 0.878, green: 0.651, blue: 0.231, alpha: 0.42)
+            let accentBg = NSColor(srgbRed: 0.357, green: 0.553, blue: 0.937, alpha: 0.26)
             for (i, range) in highlights.enumerated() {
                 let nsRange = NSRange(range, in: text)
                 guard nsRange.location != NSNotFound, nsRange.location + nsRange.length <= result.length else { continue }
@@ -90,12 +90,12 @@ enum JSONHighlighter {
 
     static func nsColor(_ kind: JSONSpanKind) -> NSColor {
         switch kind {
-        case .key: return NSColor(srgbRed: 0.063, green: 0.725, blue: 0.506, alpha: 1)
-        case .string: return NSColor(srgbRed: 0.220, green: 0.741, blue: 0.973, alpha: 1)
-        case .number: return NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 1)
-        case .boolNull: return NSColor(srgbRed: 0.957, green: 0.247, blue: 0.369, alpha: 1) // Rose #F43F5E
-        case .punct: return NSColor(srgbRed: 0.392, green: 0.455, blue: 0.545, alpha: 1)
-        case .plain: return NSColor(srgbRed: 0.886, green: 0.914, blue: 0.945, alpha: 1)
+        case .key: return NSColor(srgbRed: 0.878, green: 0.890, blue: 0.910, alpha: 1)    // #E0E3E8
+        case .string: return NSColor(srgbRed: 0.541, green: 0.690, blue: 0.961, alpha: 1) // #8AB0F5
+        case .number: return NSColor(srgbRed: 0.878, green: 0.651, blue: 0.231, alpha: 1) // #E0A63B
+        case .boolNull: return NSColor(srgbRed: 0.239, green: 0.745, blue: 0.478, alpha: 1) // #3DBE7A
+        case .punct: return NSColor(srgbRed: 0.549, green: 0.569, blue: 0.604, alpha: 1)  // #8C919A
+        case .plain: return NSColor(srgbRed: 0.788, green: 0.800, blue: 0.824, alpha: 1)  // #C9CCD2
         }
     }
 

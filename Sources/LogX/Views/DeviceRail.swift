@@ -161,8 +161,8 @@ struct DeviceRail: View {
                         .foregroundStyle(LogXTheme.accentLight)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(LogXTheme.accent.opacity(0.2), in: Capsule())
-                        .overlay(Capsule().stroke(LogXTheme.accent.opacity(0.4), lineWidth: 1))
+                        .background(LogXTheme.chipOn, in: Capsule())
+                        .overlay(Capsule().stroke(LogXTheme.chipOnEdge, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
@@ -282,18 +282,18 @@ private struct DeviceRowView: View {
                     Circle()
                         .fill(LogXTheme.accentLight)
                         .frame(width: 5, height: 5)
-                        .shadow(color: LogXTheme.accent.opacity(0.8), radius: 4)
+                        .shadow(color: LogXTheme.chipOnEdge, radius: 3)
                 }
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? LogXTheme.accent.opacity(0.18) : (hovered ? LogXTheme.panel2 : Color.clear))
+                    .fill(selected ? LogXTheme.chipOn : (hovered ? LogXTheme.panel2 : Color.clear))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(selected ? LogXTheme.accent.opacity(0.45) : Color.clear, lineWidth: 1)
+                    .stroke(selected ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -332,18 +332,18 @@ private struct AppRowView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(
-                        Capsule().fill(selected ? LogXTheme.accent.opacity(0.25) : LogXTheme.well)
+                        Capsule().fill(selected ? LogXTheme.chipOn : LogXTheme.well)
                     )
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? LogXTheme.accent.opacity(0.18) : (hovered ? LogXTheme.panel2 : Color.clear))
+                    .fill(selected ? LogXTheme.chipOn : (hovered ? LogXTheme.panel2 : Color.clear))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(selected ? LogXTheme.accent.opacity(0.45) : Color.clear, lineWidth: 1)
+                    .stroke(selected ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

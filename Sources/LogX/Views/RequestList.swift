@@ -5,6 +5,7 @@ import LogXCore
 struct RequestList: View {
     @EnvironmentObject private var store: LogStore
     @State private var now = Date()
+    @FocusState private var listFocused: Bool
     private let ticker = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -54,24 +55,38 @@ struct RequestList: View {
         VStack(spacing: 0) {
             columnHeader
             Divider().overlay(LogXTheme.divider)
-            List(store.visibleLogs, selection: Binding(
-                get: { store.selectedKey },
-                set: { key in
-                    if let key, let log = store.visibleLogs.first(where: { $0.key == key }) {
-                        store.selectLog(log)
+            ScrollViewReader { proxy in
+                List(store.visibleLogs) { log in
+                    RequestRow(log: log, selected: store.selectedKey == log.key, now: now)
+                        .id(log.key)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                        .contextMenu { rowMenu(log) }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.defaultMinListRowHeight, 40)
+                .focusable()
+                .focusEffectDisabled()
+                .focused($listFocused)
+                .simultaneousGesture(TapGesture().onEnded { listFocused = true })
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up: store.moveSelection(by: -1)
+                    case .down: store.moveSelection(by: 1)
+                    default: break
                     }
                 }
-            )) { log in
-                RequestRow(log: log, selected: store.selectedKey == log.key, now: now)
-                    .tag(log.key)
-                    .listRowBackground(store.selectedKey == log.key ? LogXTheme.accent.opacity(0.13) : LogXTheme.bg)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                    .contextMenu { rowMenu(log) }
+                .onKeyPress(.upArrow) { store.moveSelection(by: -1); return .handled }
+                .onKeyPress(.downArrow) { store.moveSelection(by: 1); return .handled }
+                .onChange(of: store.selectedKey) { _, key in
+                    guard !store.followLatest, let key,
+                          store.visibleLogs.contains(where: { $0.key == key }) else { return }
+                    proxy.scrollTo(key, anchor: .center)
+                }
+                .id(listScope)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 40)
-            .id(listScope)
         }
     }
 

@@ -27,7 +27,7 @@ enum ShareCardRenderer {
         if attrBody.length == 0 {
             attrBody.append(NSAttributedString(string: "—", attributes: [
                 .font: mono,
-                .foregroundColor: NSColor(srgbRed: 0.596, green: 0.639, blue: 0.702, alpha: 1),
+                .foregroundColor: NSColor(srgbRed: 0.549, green: 0.569, blue: 0.604, alpha: 1),
             ]))
         }
 
@@ -39,27 +39,27 @@ enum ShareCardRenderer {
         let size = NSSize(width: width, height: height)
         let image = NSImage(size: size)
         image.lockFocus()
-        NSColor(srgbRed: 0.043, green: 0.051, blue: 0.078, alpha: 1).setFill()
+        NSColor(srgbRed: 0.059, green: 0.063, blue: 0.071, alpha: 1).setFill()
         NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
 
-        NSColor(srgbRed: 0.388, green: 0.400, blue: 0.945, alpha: 1).setFill()
+        NSColor(srgbRed: 0.357, green: 0.553, blue: 0.937, alpha: 1).setFill()
         NSBezierPath(rect: NSRect(x: 0, y: 0, width: 4, height: size.height)).fill()
 
         let title = NSAttributedString(string: caption.title, attributes: [
             .font: titleFont,
-            .foregroundColor: NSColor(srgbRed: 0.973, green: 0.980, blue: 0.988, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.949, green: 0.953, blue: 0.961, alpha: 1),
         ])
         title.draw(at: NSPoint(x: pad, y: size.height - 40))
 
         let meta = NSAttributedString(string: caption.meta, attributes: [
             .font: small,
-            .foregroundColor: NSColor(srgbRed: 0.580, green: 0.639, blue: 0.722, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.549, green: 0.569, blue: 0.604, alpha: 1),
         ])
         meta.draw(in: NSRect(x: pad, y: size.height - 78, width: width - pad * 2, height: 32))
 
         let tabTitle = NSAttributedString(string: tab.title.uppercased(), attributes: [
             .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-            .foregroundColor: NSColor(srgbRed: 0.506, green: 0.549, blue: 0.973, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.541, green: 0.690, blue: 0.961, alpha: 1),
             .kern: 1.1,
         ])
         tabTitle.draw(at: NSPoint(x: pad, y: size.height - 104))
@@ -73,7 +73,7 @@ enum ShareCardRenderer {
 
         let brand = NSAttributedString(string: redact ? "LogX · yashirilgan" : "LogX", attributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: NSColor(srgbRed: 0.580, green: 0.639, blue: 0.722, alpha: 1),
+            .foregroundColor: NSColor(srgbRed: 0.549, green: 0.569, blue: 0.604, alpha: 1),
         ])
         brand.draw(at: NSPoint(x: pad, y: 14))
         image.unlockFocus()
@@ -110,12 +110,12 @@ enum ShareCardRenderer {
 
     private static func color(_ kind: JSONSpanKind) -> NSColor {
         switch kind {
-        case .key: return NSColor(srgbRed: 0.063, green: 0.725, blue: 0.506, alpha: 1) // Emerald
-        case .string: return NSColor(srgbRed: 0.220, green: 0.741, blue: 0.973, alpha: 1) // Sky
-        case .number: return NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 1) // Amber
-        case .boolNull: return NSColor(srgbRed: 0.957, green: 0.247, blue: 0.369, alpha: 1) // Rose
-        case .punct: return NSColor(srgbRed: 0.392, green: 0.455, blue: 0.545, alpha: 1)
-        case .plain: return NSColor(srgbRed: 0.796, green: 0.835, blue: 0.882, alpha: 1)
+        case .key: return NSColor(srgbRed: 0.878, green: 0.890, blue: 0.910, alpha: 1)
+        case .string: return NSColor(srgbRed: 0.541, green: 0.690, blue: 0.961, alpha: 1)
+        case .number: return NSColor(srgbRed: 0.878, green: 0.651, blue: 0.231, alpha: 1)
+        case .boolNull: return NSColor(srgbRed: 0.239, green: 0.745, blue: 0.478, alpha: 1)
+        case .punct: return NSColor(srgbRed: 0.549, green: 0.569, blue: 0.604, alpha: 1)
+        case .plain: return NSColor(srgbRed: 0.788, green: 0.800, blue: 0.824, alpha: 1)
         }
     }
 }

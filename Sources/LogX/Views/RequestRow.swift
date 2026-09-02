@@ -12,7 +12,7 @@ struct RequestRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Rectangle()
-                .fill(selected ? LogXTheme.accentLight : Color.clear)
+                .fill(selected ? LogXTheme.accent : Color.clear)
                 .frame(width: 3)
                 .padding(.vertical, 3)
 
@@ -22,7 +22,8 @@ struct RequestRow: View {
                     .foregroundStyle(LogXTheme.methodColor(log.method))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(LogXTheme.methodColor(log.method).opacity(0.15)))
+                    .background(RoundedRectangle(cornerRadius: 4).fill(LogXTheme.panel2))
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(LogXTheme.line, lineWidth: 1))
             }
             .frame(width: 58, alignment: .leading)
 
@@ -53,7 +54,7 @@ struct RequestRow: View {
                             .foregroundStyle(LogXTheme.accentLight)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1.5)
-                            .background(LogXTheme.accent.opacity(0.18), in: RoundedRectangle(cornerRadius: 3.5))
+                            .background(LogXTheme.chipOn, in: RoundedRectangle(cornerRadius: 3.5))
                             .help("Shu endpoint takrorlari")
                     }
 
@@ -64,7 +65,8 @@ struct RequestRow: View {
                             .foregroundStyle(LogXTheme.ok)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1.5)
-                            .background(LogXTheme.ok.opacity(0.18), in: RoundedRectangle(cornerRadius: 3.5))
+                            .background(LogXTheme.ok.opacity(0.14), in: RoundedRectangle(cornerRadius: 3.5))
+                            .overlay(RoundedRectangle(cornerRadius: 3.5).stroke(LogXTheme.ok.opacity(0.35), lineWidth: 1))
                     }
 
                     if hovered || copied {
@@ -111,9 +113,13 @@ struct RequestRow: View {
         }
         .padding(.horizontal, 11)
         .frame(minHeight: log.hostLabel.isEmpty ? 38 : 46)
-        .background(selected ? LogXTheme.accent.opacity(0.12) : (hovered ? LogXTheme.panel2 : Color.clear))
+        .background(selected ? LogXTheme.selection : (hovered ? LogXTheme.panel2 : Color.clear))
         .contentShape(Rectangle())
+        .onTapGesture { store.selectLog(log) }
         .onHover { hovered = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityLabel("\(log.method) \(log.responseCode.map(String.init) ?? "NET") \(store.displayPath(log))")
     }
 
     @ViewBuilder

@@ -45,7 +45,7 @@ struct DetailFindBar: View {
                 .foregroundStyle(matchCount == 0 ? LogXTheme.muted2 : LogXTheme.accentLight)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(matchCount == 0 ? LogXTheme.well : LogXTheme.accent.opacity(0.16)))
+                .background(Capsule().fill(matchCount == 0 ? LogXTheme.well : LogXTheme.chipOn))
                 .animation(.spring(response: 0.25, dampingFraction: 0.85), value: label)
             stepButton(icon: "chevron.up", help: "Oldingi (⇧⌘G)", label: "Oldingi topilma", reverse: true)
                 .keyboardShortcut("g", modifiers: [.command, .shift])

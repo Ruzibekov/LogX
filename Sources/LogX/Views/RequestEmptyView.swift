@@ -84,7 +84,7 @@ struct RequestEmptyView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(Capsule().fill(LogXTheme.accent))
-            .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+            .shadow(color: LogXTheme.glow, radius: 6, y: 2)
         }
         .buttonStyle(.plain)
         .padding(.top, 4)
@@ -106,7 +106,7 @@ struct RequestEmptyView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(Capsule().fill(LogXTheme.accent))
-            .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+            .shadow(color: LogXTheme.glow, radius: 6, y: 2)
         }
         .buttonStyle(.plain)
         .keyboardShortcut("k", modifiers: [.command, .option])
@@ -136,7 +136,7 @@ struct RequestEmptyView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(LogXTheme.accent))
-                .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+                .shadow(color: LogXTheme.glow, radius: 6, y: 2)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -165,7 +165,7 @@ struct RequestEmptyView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(LogXTheme.accent))
-                .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+                .shadow(color: LogXTheme.glow, radius: 6, y: 2)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -196,7 +196,7 @@ struct RequestEmptyView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(LogXTheme.accent))
-                .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+                .shadow(color: LogXTheme.glow, radius: 6, y: 2)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)

@@ -189,15 +189,15 @@ struct RequestDetail: View {
                                 .padding(.horizontal, 4.5)
                                 .padding(.vertical, 1)
                                 .background(
-                                    Capsule().fill(tab == item ? LogXTheme.accent.opacity(0.3) : LogXTheme.well)
+                                    Capsule().fill(tab == item ? LogXTheme.chipOn : LogXTheme.well)
                                 )
                         }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4.5)
-                    .background(Capsule().fill(tab == item ? LogXTheme.accent.opacity(0.18) : Color.clear))
+                    .background(Capsule().fill(tab == item ? LogXTheme.chipOn : Color.clear))
                     .overlay(
-                        Capsule().stroke(tab == item ? LogXTheme.accent.opacity(0.5) : Color.clear, lineWidth: 1)
+                        Capsule().stroke(tab == item ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
                     )
                     .foregroundStyle(tab == item ? LogXTheme.text : LogXTheme.muted)
                 }
@@ -246,8 +246,8 @@ struct RequestDetail: View {
             .foregroundStyle(on ? LogXTheme.text : LogXTheme.muted)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Capsule().fill(on ? LogXTheme.accent.opacity(0.18) : Color.clear))
-            .overlay(Capsule().stroke(on ? LogXTheme.accent.opacity(0.45) : LogXTheme.line, lineWidth: 1))
+            .background(Capsule().fill(on ? LogXTheme.chipOn : Color.clear))
+            .overlay(Capsule().stroke(on ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .help(help)
@@ -304,12 +304,12 @@ struct RequestDetail: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3.5)
             .background(
-                store.redactEnabled ? LogXTheme.accent.opacity(0.16) : Color.clear,
+                store.redactEnabled ? LogXTheme.chipOn : Color.clear,
                 in: Capsule()
             )
             .overlay(
                 Capsule().stroke(
-                    store.redactEnabled ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1
+                    store.redactEnabled ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1
                 )
             )
             .help("Yoqilsa ekran, ro'yxat, cURL, eksport va ulashishda token yashiriladi (⌘⇧T)")
