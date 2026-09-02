@@ -90,9 +90,9 @@ final class InspectorCompleteTests: XCTestCase {
     func testNoise_healthPingImagesAndDefaultApplyKeepsAnalytics() {
         XCTAssertTrue(LogNoise.isNoise(live("h", url: "https://api.example.com/health")))
         XCTAssertTrue(LogNoise.isNoise(live("r", url: "https://api.example.com/ready")))
-        XCTAssertTrue(LogNoise.isNoise(live("l", url: "https://api.example.com/live")))
+        XCTAssertFalse(LogNoise.isNoise(live("l", url: "https://api.example.com/live")), "business path segment is not health noise")
         XCTAssertTrue(LogNoise.isNoise(live("pi", url: "https://api.example.com/ping")))
-        XCTAssertTrue(LogNoise.isNoise(live("m", url: "https://api.example.com/metrics")))
+        XCTAssertFalse(LogNoise.isNoise(live("m", url: "https://api.example.com/metrics")))
         XCTAssertTrue(LogNoise.isNoise(live("fv", url: "https://api.example.com/favicon.ico")))
         XCTAssertTrue(LogNoise.isNoise(live("png", url: "https://cdn.example.com/img/logo.png")))
         XCTAssertTrue(LogNoise.isNoise(live("jpg", url: "https://cdn.example.com/a.jpg?w=2")))
@@ -155,28 +155,21 @@ final class InspectorCompleteTests: XCTestCase {
         XCTAssertTrue(LogFilter.matchesSlow(fast, slowOnly: false))
     }
 
-    func testStatusCountsHonorMethodNoiseSlowHost() {
+    func testApplyHonorsMethodNoiseSlowHost() {
         let getOk = live("g", method: "GET", url: "https://api.example.com/v1/persons", code: 200, duration: 100)
         let postErr = live("p", method: "POST", url: "https://api.example.com/v1/persons", code: 500, duration: 900)
         let noise = live("n", method: "GET", url: "https://www.google-analytics.com/g", code: 200, duration: 50)
-        let countsGet = LogFilter.statusCounts(
+        let onlyGet = LogFilter.apply(
             [getOk, postErr, noise],
-            appId: "all", scope: .all, query: "", method: "GET", hideNoise: true
+            appId: "all", scope: .all, status: .all, query: "", method: "GET", hideNoise: true
         )
-        XCTAssertEqual(countsGet[.all], 1)
-        XCTAssertEqual(countsGet[.ok2xx], 1)
-        XCTAssertEqual(countsGet[.err5xx], 0)
-
-        let countsSlow = LogFilter.statusCounts(
+        XCTAssertEqual(onlyGet.map(\.key), ["g"])
+        let slow = LogFilter.apply(
             [getOk, postErr],
-            appId: "all", scope: .all, query: "", slowOnly: true
+            appId: "all", scope: .all, status: .all, query: "", slowOnly: true
         )
-        XCTAssertEqual(countsSlow[.all], 1)
-        XCTAssertEqual(countsSlow[.err5xx], 1)
-
-        let empty = LogFilter.statusCounts([], appId: "all", scope: .all, query: "")
-        XCTAssertEqual(empty[.all], 0)
-        XCTAssertEqual(empty[.ok2xx], 0)
+        XCTAssertEqual(slow.map(\.key), ["p"])
+        XCTAssertTrue(LogFilter.apply([], appId: "all", scope: .all, status: .all, query: "").isEmpty)
     }
 
 
@@ -435,7 +428,7 @@ final class InspectorCompleteTests: XCTestCase {
         XCTAssertTrue(filters.contains("Sekin"), filters)
         XCTAssertTrue(list.contains("HAR nusxalash"), list)
         XCTAssertTrue(list.contains("Yo'lni nusxalash"), list)
-        XCTAssertTrue(find.contains("Topish"), find)
+        XCTAssertTrue(find.contains("topish"), find)
         XCTAssertTrue(find.contains("keyboardShortcut(\"g\""), find)
         XCTAssertTrue(detail.contains("DetailFindBar"), detail)
         XCTAssertTrue(detail.contains("activeIndex"), detail)

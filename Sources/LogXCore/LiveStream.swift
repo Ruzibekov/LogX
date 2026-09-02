@@ -1,7 +1,6 @@
 import Foundation
 
 public enum StreamHealth: Equatable, Sendable {
-    case idle
     case connecting
     case live
     case reconnecting(attempt: Int, nextDelay: TimeInterval)
@@ -21,9 +20,20 @@ public enum ReconnectBackoff: Sendable {
     public static let initial: TimeInterval = 0.4
     public static let maxDelay: TimeInterval = 8
 
+    /// Shuncha soniya tirik turgan oqim «barqaror» sanaladi va uzilishdan keyin
+    /// kutish boshidan boshlanadi; undan qisqa yashagan oqim (server darhol
+    /// yopadigan holat) kutishni oshirib boradi — tez aylanma bo'lmaydi.
+    public static let stableAfter: TimeInterval = 5
+
     public static func next(_ current: TimeInterval) -> TimeInterval {
         let base = current > 0 ? current : initial
         return min(base * 2, maxDelay)
+    }
+
+    /// Uzilishdan keyin qancha kutish: `connectedFor` — oqim qancha yashagani.
+    public static func afterDrop(current: TimeInterval, connectedFor: TimeInterval) -> TimeInterval {
+        if connectedFor >= stableAfter || current <= 0 { return initial }
+        return next(current)
     }
 }
 
@@ -109,12 +119,82 @@ public enum LiveLogDecoder: Sendable {
 public enum LiveStreamChunk: Sendable {
     case opened
     case logs([NetworkLog])
+    /// Server `event: error` yubordi (masalan, qurilma uzildi) — oqim hali ochiq.
+    case serverError(String)
+}
+
+/// Loglarni 20 tagacha yoki 50 ms gacha to'plab, keyin bittada beradi. Taymer
+/// mustaqil ishlaydi — oxirgi log keyingi http hodisasini kutmaydi.
+actor LogBatcher {
+    static let maxCount = 20
+    static let maxDelayNanos: UInt64 = 50_000_000
+
+    private var items: [NetworkLog] = []
+    private var timer: Task<Void, Never>?
+    private var flushing = false
+    private let sink: @Sendable ([NetworkLog]) async -> Void
+
+    init(sink: @escaping @Sendable ([NetworkLog]) async -> Void) {
+        self.sink = sink
+    }
+
+    func add(_ log: NetworkLog) async {
+        items.append(log)
+        if items.count >= Self.maxCount {
+            await flushNow()
+            return
+        }
+        guard timer == nil else { return }
+        timer = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: LogBatcher.maxDelayNanos)
+            guard !Task.isCancelled else { return }
+            await self?.timerFired()
+        }
+    }
+
+    private func timerFired() async {
+        timer = nil
+        await flushNow()
+    }
+
+    func flushNow() async {
+        timer?.cancel()
+        timer = nil
+        guard !flushing else { return }
+        flushing = true
+        defer { flushing = false }
+        while !items.isEmpty {
+            let out = items
+            items.removeAll(keepingCapacity: true)
+            await sink(out)
+        }
+    }
+
+    var pendingCount: Int { items.count }
+}
+
+/// Oqimdan oxirgi bayt qachon kelganini saqlaydi — jim o'lgan ulanishni aniqlash uchun.
+actor StreamPulse {
+    private var last = Date()
+
+    func beat() {
+        last = Date()
+    }
+
+    func idle(now: Date = Date()) -> TimeInterval {
+        now.timeIntervalSince(last)
+    }
 }
 
 public enum LiveStreamPump: Sendable {
+    /// Server har 15 s `: ping` yuboradi; shuncha vaqt hech narsa kelmasa ulanish
+    /// o'lgan sanaladi (uyqudan keyin TCP FIN kelmaydigan holat).
+    public static let idleTimeout: TimeInterval = 45
+
     public static func run(
         request: URLRequest,
         serial: String,
+        idleTimeout: TimeInterval = LiveStreamPump.idleTimeout,
         onChunk: @escaping @Sendable (LiveStreamChunk) async -> Void
     ) async throws {
         let (bytes, response) = try await MonitorSessions.stream.bytes(for: request)
@@ -123,27 +203,47 @@ public enum LiveStreamPump: Sendable {
         guard (200..<300).contains(code) else { throw MonitorClientError.http(code) }
         await onChunk(.opened)
 
+        let pulse = StreamPulse()
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await consume(bytes: bytes, serial: serial, pulse: pulse, onChunk: onChunk)
+            }
+            group.addTask {
+                let step = max(1, min(5, idleTimeout / 3))
+                while true {
+                    try await Task.sleep(nanoseconds: UInt64(step * 1_000_000_000))
+                    if await pulse.idle() >= idleTimeout {
+                        throw MonitorClientError.idle(Int(idleTimeout))
+                    }
+                }
+            }
+            try await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private static func consume(
+        bytes: URLSession.AsyncBytes,
+        serial: String,
+        pulse: StreamPulse,
+        onChunk: @escaping @Sendable (LiveStreamChunk) async -> Void
+    ) async throws {
         var sse = SSEDecoder()
-        var batch: [NetworkLog] = []
-        var lastFlush = Date()
+        let batcher = LogBatcher { logs in await onChunk(.logs(logs)) }
+        defer { Task { await batcher.flushNow() } }
 
         for try await line in SSELineReader(bytes: bytes) {
             try Task.checkCancellation()
+            await pulse.beat()
             guard let event = sse.feed(line: line) else { continue }
-            if event.event == "meta" { continue }
+            if event.event == "error" {
+                await onChunk(.serverError(event.data))
+                continue
+            }
             guard event.event == "http" else { continue }
             guard let item = LiveLogDecoder.decode(event.data, serial: serial) else { continue }
-            batch.append(item)
-            let now = Date()
-            if batch.count >= 20 || now.timeIntervalSince(lastFlush) >= 0.05 {
-                let out = batch
-                batch.removeAll(keepingCapacity: true)
-                lastFlush = now
-                await onChunk(.logs(out))
-            }
+            await batcher.add(item)
         }
-        if !batch.isEmpty {
-            await onChunk(.logs(batch))
-        }
+        await batcher.flushNow()
     }
 }

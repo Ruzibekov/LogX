@@ -7,12 +7,10 @@ enum ShareCardRenderer {
         if redact {
             subject.requestHeaders = Redactor.mask(log.requestHeaders)
             subject.responseHeaders = Redactor.mask(log.responseHeaders)
-            subject.requestBody = Redactor.maskText(log.requestBody)
-            subject.responseBody = Redactor.maskText(log.responseBody)
         }
-        let body = JSONFormat.body(for: subject, tab: tab)
+        let body = JSONFormat.body(for: subject, tab: tab, redact: redact)
         let spans = (tab == .headers || tab == .params) ? [JSONSpan(body, .plain)] : JSONFormat.highlight(body.isEmpty ? "—" : body)
-        let caption = ShareCardRenderer.header(subject)
+        let caption = ShareCardRenderer.header(subject, redact: redact)
         let width: CGFloat = 920
         let pad: CGFloat = 28
         let mono = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
@@ -95,9 +93,14 @@ enum ShareCardRenderer {
         var meta: String
     }
 
-    private static func header(_ log: NetworkLog) -> Header {
+    static func headerMeta(_ log: NetworkLog, redact: Bool) -> String {
+        header(log, redact: redact).meta
+    }
+
+    private static func header(_ log: NetworkLog, redact: Bool) -> Header {
         let code = log.responseCode.map(String.init) ?? "NET"
-        let url = log.url.isEmpty ? log.api : log.url
+        let rawURL = log.url.isEmpty ? log.api : log.url
+        let url = redact ? Redactor.maskURL(rawURL) : rawURL
         let app = log.appShortLabel == AppProfile.unknown.shortLabel ? "" : log.appShortLabel
         return Header(
             title: "\(log.method)  \(code)",

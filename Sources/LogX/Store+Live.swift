@@ -15,9 +15,29 @@ extension LogStore {
     func cancelLiveWork() {
         pollTask?.cancel()
         pollTask = nil
+        dropLiveStreams()
+    }
+
+    /// Barcha stream tasklarini to'xtatadi; server qaytgach `syncLiveStreams`
+    /// ularni yangidan ochadi (osilib qolgan TCP ulanish qayta ishlatilmaydi).
+    func dropLiveStreams() {
         for task in liveTasks.values { task.cancel() }
         liveTasks.removeAll()
         streamHealthBySerial.removeAll()
+    }
+
+    /// Stream haqidagi banner (`event: error`) refresh muvaffaqiyatida o'chirilmaydi.
+    var bannerIsStreamNotice: Bool { banner?.hasPrefix("Stream: ") == true }
+
+    func markServerDown(_ error: Error) {
+        let wasUp = serverOK
+        serverOK = false
+        banner = (error as? MonitorClientError)?.description ?? String(describing: error)
+        if wasUp {
+            LogXLog.write("server down: \(banner ?? "")")
+            dropLiveStreams()
+        }
+        publishConnection()
     }
 
     func syncLiveStreams() {
@@ -38,7 +58,7 @@ extension LogStore {
     }
 
     func stream(serial: String) async {
-        var delay = ReconnectBackoff.initial
+        var delay: TimeInterval = 0
         var attempt = 0
         setHealth(serial, .connecting)
         defer {
@@ -55,30 +75,32 @@ extension LogStore {
             var req = URLRequest(url: url)
             req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             req.cachePolicy = .reloadIgnoringLocalCacheData
-            req.timeoutInterval = .infinity
+            req.timeoutInterval = LiveStreamPump.idleTimeout
 
+            let startedAt = Date()
+            var reason = "eof"
             do {
                 try await LiveStreamPump.run(request: req, serial: serial) { chunk in
                     await MainActor.run {
                         self.handleStreamChunk(serial: serial, chunk: chunk)
                     }
                 }
-                if Task.isCancelled { break }
-                delay = ReconnectBackoff.initial
-                attempt += 1
-                setHealth(serial, .reconnecting(attempt: attempt, nextDelay: delay))
-                LogXLog.write("stream drop serial=\(serial) eof retry=\(attempt) delay=\(delay)")
-                try await Task.sleep(nanoseconds: nanoseconds(delay))
-                delay = ReconnectBackoff.next(delay)
             } catch is CancellationError {
                 break
             } catch {
-                if Task.isCancelled { break }
-                attempt += 1
-                setHealth(serial, .reconnecting(attempt: attempt, nextDelay: delay))
-                LogXLog.write("stream drop serial=\(serial) retry=\(attempt) delay=\(delay) \(error)")
-                try? await Task.sleep(nanoseconds: nanoseconds(delay))
-                delay = ReconnectBackoff.next(delay)
+                reason = String(describing: error)
+            }
+            if Task.isCancelled { break }
+            let connectedFor = Date().timeIntervalSince(startedAt)
+            if connectedFor >= ReconnectBackoff.stableAfter { attempt = 0 }
+            attempt += 1
+            delay = ReconnectBackoff.afterDrop(current: delay, connectedFor: connectedFor)
+            setHealth(serial, .reconnecting(attempt: attempt, nextDelay: delay))
+            LogXLog.write("stream drop serial=\(serial) retry=\(attempt) delay=\(delay) \(reason)")
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds(delay))
+            } catch {
+                break
             }
         }
     }
@@ -88,8 +110,35 @@ extension LogStore {
         case .opened:
             setHealth(serial, .live)
         case .logs(let items):
+            if bannerIsStreamNotice { banner = nil }
             ingestBatch(items)
+            noteUnknownApps(serial: serial, items: items)
+        case .serverError(let message):
+            banner = "Stream: \(message)"
+            LogXLog.write("stream error serial=\(serial) \(message)")
         }
+    }
+
+    /// Server pid→paket xaritasini stream ochilganda bir marta quradi; ilova qayta
+    /// ishga tushsa hamma yangi log «Noma'lum» bo'ladi. Ketma-ket N noma'lum log
+    /// kelsa stream qayta ochiladi (30 s da bir martadan ko'p emas).
+    func noteUnknownApps(serial: String, items: [NetworkLog]) {
+        var streak = unknownAppStreak[serial] ?? 0
+        for item in items {
+            streak = item.resolvedAppId == AppProfile.unknownId ? streak + 1 : 0
+        }
+        unknownAppStreak[serial] = streak
+        guard streak >= LogStore.unknownStreakLimit else { return }
+        let now = Date()
+        if let last = lastUnknownReopen[serial], now.timeIntervalSince(last) < LogStore.unknownReopenThrottle {
+            return
+        }
+        lastUnknownReopen[serial] = now
+        unknownAppStreak[serial] = 0
+        LogXLog.write("stream reopen serial=\(serial) reason=unknown-app-streak")
+        liveTasks[serial]?.cancel()
+        liveTasks[serial] = nil
+        syncLiveStreams()
     }
 
     func setHealth(_ serial: String, _ health: StreamHealth) {
@@ -100,35 +149,43 @@ extension LogStore {
 
     func ingestBatch(_ items: [NetworkLog]) {
         guard !items.isEmpty else { return }
-        var ingested: [NetworkLog] = []
-        ingested.reserveCapacity(items.count)
-        for item in items {
-            lastActivityTs = item.ts
-            if isPaused {
-                skippedWhilePaused += 1
-                continue
+        if isPaused {
+            pendingWhilePaused.append(contentsOf: items.filter { !clearedKeys.contains($0.key) })
+            if pendingWhilePaused.count > maxLogCapacity {
+                pendingWhilePaused.removeFirst(pendingWhilePaused.count - maxLogCapacity)
             }
-            liveByKey[item.key] = item
-            ingested.append(item)
-            if selectedKey == nil { selectedKey = item.key }
+            return
         }
-        if !isPaused {
-            rebuildFromLive()
-            if followLatest,
-               let key = FollowLatest.selectedKey(
-                batch: ingested,
-                currentKey: selectedKey,
-                follow: true,
-                paused: false
-               ) {
+        var fresh: [NetworkLog] = []
+        var updated = false
+        for var item in items {
+            if clearedKeys.contains(item.key) { continue }
+            if let existing = liveByKey[item.key] {
+                if item.ts == nil || (existing.ts ?? 0) > 0 { item.ts = existing.ts }
+                if existing != item {
+                    liveByKey[item.key] = item
+                    queryMatchCache.removeValue(forKey: item.key)
+                    updated = true
+                }
+            } else {
+                liveByKey[item.key] = item
+                fresh.append(item)
+            }
+        }
+        guard !fresh.isEmpty || updated else { return }
+        if let ts = fresh.compactMap(\.ts).max() { lastActivityTs = max(lastActivityTs ?? 0, ts) }
+        rebuildFromLive()
+        guard !fresh.isEmpty else {
+            reconcileSelection()
+            return
+        }
+        if followLatest {
+            let visibleNew = fresh.filter { cachedVisibleKeys.contains($0.key) }
+            if let key = FollowLatest.selectedKey(batch: visibleNew, currentKey: selectedKey, follow: true, paused: false) {
                 selectedKey = key
-                Task { await loadDetail(key) }
             }
         }
-    }
-
-    func decodeLive(_ raw: String, serial: String) -> NetworkLog? {
-        LiveLogDecoder.decode(raw, serial: serial)
+        reconcileSelection()
     }
 
     func pollLoop() async {
@@ -136,20 +193,31 @@ extension LogStore {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             if Task.isCancelled { break }
             if !serverOK {
-                let ok = await client.ensureServer(projectRoot: MonitorClient.projectRoot())
+                let ok = await recoverServer()
                 if Task.isCancelled { break }
                 if ok {
                     serverOK = true
                     banner = nil
                     await refresh(full: true)
                     syncLiveStreams()
-                    continue
                 }
+                continue
             }
             await refresh()
             if Task.isCancelled { break }
             syncLiveStreams()
         }
+    }
+
+    /// Server yo'qligida har 3 s ping qilinadi, `service.sh start` esa
+    /// 30 s da bir martadan ko'p yurgizilmaydi.
+    func recoverServer() async -> Bool {
+        if await client.ping() { return true }
+        if let last = lastServerStartAttempt, Date().timeIntervalSince(last) < LogStore.serverStartRetryInterval {
+            return false
+        }
+        lastServerStartAttempt = Date()
+        return await client.ensureServer(projectRoot: MonitorClient.projectRoot())
     }
 
     private func nanoseconds(_ delay: TimeInterval) -> UInt64 {

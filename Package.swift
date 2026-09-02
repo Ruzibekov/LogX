@@ -11,6 +11,6 @@ let package = Package(
     targets: [
         .target(name: "LogXCore", path: "Sources/LogXCore"),
         .executableTarget(name: "LogX", dependencies: ["LogXCore"], path: "Sources/LogX"),
-        .testTarget(name: "LogXTests", dependencies: ["LogXCore"], path: "Tests/LogXTests"),
+        .testTarget(name: "LogXTests", dependencies: ["LogXCore", "LogX"], path: "Tests/LogXTests"),
     ]
 )

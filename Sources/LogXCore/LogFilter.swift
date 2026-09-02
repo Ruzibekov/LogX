@@ -3,62 +3,20 @@ import Foundation
 public enum DeviceScope: Equatable, Sendable {
     case all
     case usb(ConnectedDevice)
-    case field(FieldDevice)
 
     public var title: String {
         switch self {
         case .all: return "Barcha qurilmalar"
         case .usb(let device): return device.title
-        case .field(let field): return field.label
         }
     }
 
-    public static func resolved(
-        usbSerial: String?,
-        fieldId: String?,
-        devices: [ConnectedDevice],
-        fields: [FieldDevice]
-    ) -> (scope: DeviceScope, usbSerial: String?, fieldId: String?) {
+    /// Saqlangan serial hozir ulangan qurilmalar ichida bo'lsa shu qurilma, aks holda hammasi.
+    public static func resolved(usbSerial: String?, devices: [ConnectedDevice]) -> (scope: DeviceScope, usbSerial: String?) {
         if let serial = usbSerial, let device = devices.first(where: { $0.serial == serial }) {
-            return (.usb(device), serial, nil)
+            return (.usb(device), serial)
         }
-        if let id = fieldId, let field = fields.first(where: { $0.id == id }) {
-            return (.field(field), nil, id)
-        }
-        return (.all, nil, nil)
-    }
-}
-
-public struct FieldDevice: Identifiable, Equatable, Sendable {
-    public var id: String
-    public var label: String
-    public var count: Int
-
-    public init(id: String, label: String, count: Int) {
-        self.id = id
-        self.label = label
-        self.count = count
-    }
-}
-
-public enum FieldDevices {
-    public static func collect(_ logs: [NetworkLog]) -> [FieldDevice] {
-        var map: [String: (label: String, count: Int)] = [:]
-        for log in logs {
-            let label = log.fieldDeviceLabel
-            guard label != "—" else { continue }
-            let id = log.fieldDeviceId
-            var cur = map[id] ?? (label, 0)
-            cur.count += 1
-            if cur.label == "—" { cur.label = label }
-            map[id] = cur
-        }
-        return map
-            .map { FieldDevice(id: $0.key, label: $0.value.label, count: $0.value.count) }
-            .sorted {
-                if $0.count != $1.count { return $0.count > $1.count }
-                return $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
-            }
+        return (.all, nil)
     }
 }
 
@@ -75,10 +33,6 @@ public enum LogFilter {
         return log.resolvedAppId == AppProfile.resolveId(appId)
     }
 
-    public static func matchesDevice(_ log: NetworkLog, device: ConnectedDevice?) -> Bool {
-        matchesDevice(log, scope: device.map { .usb($0) } ?? .all)
-    }
-
     public static func matchesDevice(_ log: NetworkLog, scope: DeviceScope) -> Bool {
         switch scope {
         case .all:
@@ -88,14 +42,6 @@ public enum LogFilter {
                 return serial == device.serial
             }
             return false
-        case .field(let field):
-            if log.fieldDeviceId == field.id { return true }
-            let needle = field.label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            guard !needle.isEmpty, needle != "—" else { return false }
-            let hay = [log.device, log.deviceModel, log.deviceName]
-                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-                .filter { !$0.isEmpty }
-            return hay.contains { $0 == needle || $0.contains(needle) || needle.contains($0) }
         }
     }
 
@@ -113,8 +59,7 @@ public enum LogFilter {
         if hit(log.method) { return true }
         if hit(log.url) { return true }
         if hit(log.api) { return true }
-        if hit(log.hostLabel) { return true }
-        if hit(log.pathLabel) { return true }
+        if hit(log.queryString.removingPercentEncoding) { return true }
         if hit(log.packageName) { return true }
         if hit(log.device) { return true }
         if hit(log.deviceModel) { return true }
@@ -128,17 +73,14 @@ public enum LogFilter {
         if let code = log.responseCode, hit(String(code)) { return true }
         if hit(log.appLabel) { return true }
         if hit(log.appShortLabel) { return true }
-        if hit(log.requestBody) { return true }
-        if hit(log.responseBody) { return true }
         for (key, value) in log.requestHeaders {
             if hit(key) || hit(value) { return true }
         }
         for (key, value) in log.responseHeaders {
             if hit(key) || hit(value) { return true }
         }
-        for pair in log.queryParams {
-            if hit(pair.key) || hit(pair.value) { return true }
-        }
+        if hit(log.requestBody) { return true }
+        if hit(log.responseBody) { return true }
         return false
     }
 
@@ -157,16 +99,6 @@ public enum LogFilter {
         guard slowOnly else { return true }
         guard let ms = log.durationMs else { return false }
         return ms >= LogNoise.slowThresholdMs
-    }
-
-    public static func apply(
-        _ logs: [NetworkLog],
-        appId: String?,
-        device: ConnectedDevice?,
-        status: StatusClass,
-        query: String
-    ) -> [NetworkLog] {
-        apply(logs, appId: appId, scope: device.map { .usb($0) } ?? .all, status: status, query: query)
     }
 
     public static func apply(
@@ -197,49 +129,37 @@ public enum LogFilter {
                 guard matchesStatus(log, status: status) else { return false }
             }
             guard matchesQuery(log, query: query) else { return false }
-            if favoritesOnly && !favoriteKeys.contains(log.key) { return false }
+            if favoritesOnly && !favoriteKeys.contains(FavoriteKey.hash(log.key)) { return false }
             return true
         }
         .sorted { ($0.ts ?? 0) > ($1.ts ?? 0) }
     }
 
-    public static func statusCounts(
-        _ logs: [NetworkLog],
-        appId: String?,
-        scope: DeviceScope,
-        query: String,
-        favoritesOnly: Bool = false,
-        favoriteKeys: Set<String> = [],
-        method: String = "ALL",
-        hideNoise: Bool = false,
-        slowOnly: Bool = false,
-        selectedHost: String? = nil
-    ) -> [StatusClass: Int] {
-        var counts: [StatusClass: Int] = [
-            .all: 0, .ok2xx: 0, .redirect3xx: 0, .err4xx: 0, .err5xx: 0, .net: 0,
-        ]
-        let filtered = apply(
-            logs,
-            appId: appId,
-            scope: scope,
-            status: .all,
-            query: query,
-            favoritesOnly: favoritesOnly,
-            favoriteKeys: favoriteKeys,
-            errorsOnly: false,
-            method: method,
-            hideNoise: hideNoise,
-            slowOnly: slowOnly,
-            selectedHost: selectedHost
-        )
-        for log in filtered {
-            counts[.all, default: 0] += 1
-            counts[log.statusClass, default: 0] += 1
-        }
-        return counts
-    }
-
     public static var errorClasses: [StatusClass] {
         [.err4xx, .err5xx, .net]
+    }
+}
+
+/// Sevimlilar diskda kalit bilan emas, kalitning xeshi bilan saqlanadi — kalit ichida
+/// to'liq URL (query'dagi token bilan) bor, u UserDefaults plist'iga tushmasin.
+public enum FavoriteKey {
+    public static let maxStored = 500
+
+    public static func hash(_ key: String) -> String {
+        var h: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in key.utf8 {
+            h ^= UInt64(byte)
+            h = h &* 0x0000_0100_0000_01b3
+        }
+        return String(h, radix: 16)
+    }
+
+    /// Saqlash chegarasi: avval jonli ro'yxatda yo'q eski xeshlar tashlanadi.
+    public static func prune(_ hashes: Set<String>, live: Set<String>) -> Set<String> {
+        guard hashes.count > maxStored else { return hashes }
+        let kept = hashes.intersection(live)
+        if kept.count >= maxStored { return kept }
+        let stale = hashes.subtracting(live).sorted()
+        return kept.union(stale.prefix(maxStored - kept.count))
     }
 }

@@ -6,9 +6,6 @@ struct DetailHeader: View {
     @EnvironmentObject private var store: LogStore
     var log: NetworkLog
     var tab: DetailTab
-    var copied: Bool
-    var onCopy: () -> Void
-    var onShare: () -> Void
     @State private var urlCopied = false
 
     var body: some View {
@@ -50,11 +47,11 @@ struct DetailHeader: View {
                         .stroke(LogXTheme.status(log.statusClass).opacity(0.3), lineWidth: 1)
                 )
 
-                if let ms = log.durationMs {
+                if log.durationMs != nil {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
                             .font(.system(size: 9.5))
-                        Text(ms >= 1000 ? String(format: "%.2f s", Double(ms) / 1000) : "\(ms) ms")
+                        Text(log.formattedDuration)
                     }
                     .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                     .foregroundStyle(LogXTheme.muted)
@@ -74,20 +71,18 @@ struct DetailHeader: View {
 
                 Spacer()
 
-                HeaderIconButton(icon: copied ? "checkmark" : "doc.on.doc", isHighlighted: copied, help: "Nusxa", action: onCopy)
                 HeaderIconButton(
-                    icon: store.favoriteKeys.contains(log.key) ? "star.fill" : "star",
-                    isHighlighted: store.favoriteKeys.contains(log.key),
+                    icon: store.isFavorite(log.key) ? "star.fill" : "star",
+                    isHighlighted: store.isFavorite(log.key),
                     highlightColor: LogXTheme.warn,
                     help: "Sevimli"
                 ) {
                     store.toggleFavorite(log.key)
                 }
-                HeaderIconButton(icon: "square.and.arrow.up", help: "Rasm ulashish", action: onShare)
             }
 
             HStack(spacing: 8) {
-                Text(log.url.isEmpty ? log.api : log.url)
+                Text(store.shareableURL(log))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(LogXTheme.text2)
                     .lineLimit(2)
@@ -96,7 +91,7 @@ struct DetailHeader: View {
                 Spacer(minLength: 4)
 
                 Button {
-                    CopyBox.plainText(log.url.isEmpty ? log.api : log.url)
+                    CopyBox.plainText(store.shareableURL(log))
                     urlCopied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { urlCopied = false }
                 } label: {
@@ -107,6 +102,7 @@ struct DetailHeader: View {
                 }
                 .buttonStyle(.plain)
                 .help("URL nusxalash")
+                .accessibilityLabel("URL nusxalash")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -121,7 +117,7 @@ struct DetailHeader: View {
 
             HStack(spacing: 6) {
                 metaChip("Ilova", log.appLabel)
-                metaChip("Qurilma", log.fieldDeviceLabel)
+                metaChip("Qurilma", deviceLabel)
                 if let env = log.environment, !env.isEmpty {
                     metaChip("Muhit", [env, log.flavor, log.appVersion].compactMap { $0 }.joined(separator: " · "))
                 }
@@ -130,18 +126,16 @@ struct DetailHeader: View {
                 }
             }
 
-            let pinfl = log.userInfoPinfl ?? log.assistantJshshir
-            let sid = log.sessionId
-            let did = log.requestHeaders["device-id"]
-            if (pinfl != nil && !pinfl!.isEmpty) || (sid != nil && !sid!.isEmpty) || (did != nil && !did!.isEmpty) {
+            let identity = identityChips
+            if !identity.isEmpty {
                 HStack(spacing: 6) {
-                    if let pinfl, !pinfl.isEmpty { metaChip("PINFL", pinfl) }
-                    if let sid, !sid.isEmpty { metaChip("Sessiya", sid) }
-                    if let did, !did.isEmpty { metaChip("device-id", did) }
+                    ForEach(identity, id: \.key) { chip in
+                        metaChip(chip.key, chip.value)
+                    }
                 }
             }
 
-            if let msg = log.responseBodyMessage ?? log.responseMessage, !msg.isEmpty {
+            if let msg = problemMessage {
                 HStack(spacing: 7) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 11, weight: .semibold))
@@ -163,6 +157,40 @@ struct DetailHeader: View {
         }
         .padding(12)
         .background(LogXTheme.panel)
+    }
+
+    private var deviceLabel: String {
+        let label = log.fieldDeviceLabel
+        if label != "—" { return label }
+        if let serial = log.serial, !serial.isEmpty { return serial }
+        return label
+    }
+
+    /// PINFL / sessiya / device-id — «Tokenlar» yoqiq bo'lsa qiymat yashiriladi,
+    /// chip esa qoladi (mavjudligi ko'rinsin).
+    private var identityChips: [(key: String, value: String)] {
+        let redact = store.redactEnabled
+        var out: [(key: String, value: String)] = []
+        if let pinfl = log.userInfoPinfl ?? log.assistantJshshir, !pinfl.isEmpty {
+            out.append(("PINFL", redact ? Redactor.placeholder : pinfl))
+        }
+        if let sid = log.sessionId, !sid.isEmpty {
+            out.append(("Sessiya", redact ? Redactor.placeholder : sid))
+        }
+        if let did = log.requestHeaders["device-id"], !did.isEmpty {
+            out.append(("device-id", redact ? Redactor.placeholder : did))
+        }
+        return out
+    }
+
+    /// Ogohlantirish faqat muammo bo'lganda: xato, tarmoq uzilishi yoki 2xx bo'lmagan javob.
+    private var problemMessage: String? {
+        if let err = log.error, !err.isEmpty { return err }
+        guard log.statusClass != .ok2xx, log.statusClass != .redirect3xx else { return nil }
+        let msg = log.responseBodyMessage ?? log.responseMessage
+        guard let msg, !msg.isEmpty else { return nil }
+        if msg.caseInsensitiveCompare(log.statusDescription) == .orderedSame { return nil }
+        return msg
     }
 
     private func metaChip(_ k: String, _ v: String) -> some View {
@@ -188,6 +216,7 @@ struct DetailHeader: View {
         }
         .buttonStyle(.plain)
         .help("Nusxalash")
+        .accessibilityLabel("\(k) nusxalash")
     }
 
     private func bodySizeLabel(_ log: NetworkLog) -> String {
@@ -198,10 +227,7 @@ struct DetailHeader: View {
         case .headers: raw = JSONFormat.headersText(request: log.requestHeaders, response: log.responseHeaders)
         case .params: raw = JSONFormat.body(for: log, tab: .params)
         }
-        let bytes = raw.utf8.count
-        if bytes >= 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / 1_048_576) }
-        if bytes >= 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
-        return "\(bytes) B"
+        return ByteSize.label(raw.utf8.count)
     }
 }
 
@@ -231,5 +257,6 @@ private struct HeaderIconButton: View {
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .help(help)
+        .accessibilityLabel(help)
     }
 }

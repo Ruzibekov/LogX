@@ -37,8 +37,11 @@ struct RequestLiveBar: View {
             parts.append("\(store.visibleLogs.count) ko'rinadi")
         }
         parts.append("\(store.allLogs.count) so'rov")
-        if store.isPaused, store.skippedWhilePaused > 0 {
-            parts.append("\(store.skippedWhilePaused) o'tkazildi")
+        if store.isPaused, store.pendingWhilePausedCount > 0 {
+            parts.append("\(store.pendingWhilePausedCount) buferda")
+        }
+        if store.isNearCapacity {
+            parts.append("sig'im \(store.maxLogCapacity) — eskilari tushadi")
         }
         parts.append("oxirgisi \(RelativeTime.label(ts: store.lastActivityTs, now: now))")
         return parts.joined(separator: " · ")

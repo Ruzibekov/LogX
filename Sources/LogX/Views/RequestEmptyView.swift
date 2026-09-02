@@ -12,7 +12,7 @@ struct RequestEmptyView: View {
                     icon: "wifi.slash",
                     tint: LogXTheme.err,
                     title: "Monitor yo'q",
-                    subtitle: "8787 ishlamayapti — qayta ulanishni bosing."
+                    subtitle: store.banner ?? "8787 ishlamayapti — qayta ulanishni bosing."
                 ) {
                     reconnectButton
                 }
@@ -35,7 +35,7 @@ struct RequestEmptyView: View {
                     icon: "arrow.triangle.2.circlepath",
                     tint: LogXTheme.warn,
                     title: "Qayta ulanmoqda…",
-                    subtitle: "Stream uzildi — tiklanmoqda."
+                    subtitle: store.banner ?? "Stream uzildi — tiklanmoqda."
                 ) {
                     reconnectButton
                 }
@@ -46,13 +46,19 @@ struct RequestEmptyView: View {
                         tint: store.connection == .paused ? LogXTheme.warn : LogXTheme.accentLight,
                         title: store.connection == .paused ? "Pauza" : (store.banner ?? "So'rov yo'q"),
                         subtitle: store.connection == .paused
-                            ? (store.skippedWhilePaused > 0
-                               ? "\(store.skippedWhilePaused) ta so'rov o'tkazib yuborildi."
-                               : "Yangi so'rovlar qabul qilinmaydi.")
-                            : "Ilovani oching — USB stream jonli."
-                    )
+                            ? (store.pendingWhilePausedCount > 0
+                               ? "\(store.pendingWhilePausedCount) ta so'rov buferda — davom etilganda kiradi."
+                               : "Yangi so'rovlar buferda to'planadi.")
+                            : (store.canUndoClear ? "Ro'yxat tozalandi." : "Ilovani oching — USB stream jonli.")
+                    ) {
+                        if store.canUndoClear {
+                            undoClearButton
+                        }
+                    }
                 } else if store.hasActiveFilter {
                     filterEmpty
+                } else if store.scopedLogCount > 0, store.noiseHiddenCount == store.scopedLogCount {
+                    noiseEmpty
                 } else {
                     usbEmpty
                 }
@@ -84,6 +90,30 @@ struct RequestEmptyView: View {
         .padding(.top, 4)
     }
 
+    private var undoClearButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                store.undoClear()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 11, weight: .bold))
+                Text("Tozalashni bekor qilish")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(LogXTheme.text)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(LogXTheme.accent))
+            .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut("k", modifiers: [.command, .option])
+        .help("Tozalangan so'rovlarni qaytarish (⌥⌘K)")
+        .padding(.top, 4)
+    }
+
     private var filterEmpty: some View {
         emptyChrome(
             icon: "line.3.horizontal.decrease.circle",
@@ -100,6 +130,35 @@ struct RequestEmptyView: View {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 11, weight: .bold))
                     Text("Filtrlarni tozalash")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(LogXTheme.text)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(LogXTheme.accent))
+                .shadow(color: LogXTheme.accent.opacity(0.4), radius: 8, y: 3)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+    }
+
+    private var noiseEmpty: some View {
+        emptyChrome(
+            icon: "waveform.slash",
+            tint: LogXTheme.warn,
+            title: "Hammasi shovqin",
+            subtitle: "\(store.noiseHiddenCount) ta so'rov analitika/health sifatida yashirilgan."
+        ) {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    store.toggleHideNoise()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "eye")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Shovqinni ko'rsatish")
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundStyle(LogXTheme.text)

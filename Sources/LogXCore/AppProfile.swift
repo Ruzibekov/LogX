@@ -95,7 +95,7 @@ public struct AppProfile: Identifiable, Equatable, Sendable, Codable {
         let trimmedId = id.trimmingCharacters(in: .whitespacesAndNewlines)
         let pkg = (packageName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedId == unknownId || (trimmedId.isEmpty && pkg.isEmpty) { return unknown }
-        let seed = pkg.isEmpty ? trimmedId : (pkg.split(separator: ".").last.map(String.init) ?? pkg)
+        let seed = pkg.isEmpty ? trimmedId : packageSeed(pkg)
         let short = humanize(seed)
         return AppProfile(
             id: trimmedId.isEmpty ? pkg : trimmedId,
@@ -137,6 +137,18 @@ public struct AppProfile: Identifiable, Equatable, Sendable, Codable {
             }
         out.append(contentsOf: rest)
         return out
+    }
+
+    /// Paketning oxirgi segmenti umumiy so'z bo'lsa (`…myapp.android`) oldingisi olinadi.
+    static let genericSegments: Set<String> = ["app", "android", "mobile", "client", "debug", "release", "dev", "prod", "staging"]
+
+    static func packageSeed(_ pkg: String) -> String {
+        let parts = pkg.split(separator: ".").map(String.init)
+        guard let last = parts.last else { return pkg }
+        if parts.count >= 2, genericSegments.contains(last.lowercased()) {
+            return parts[parts.count - 2]
+        }
+        return last
     }
 
     public static func humanize(_ raw: String) -> String {

@@ -3,7 +3,6 @@ import LogXCore
 
 enum LogXTheme {
     static let bg = Color(red: 0.043, green: 0.051, blue: 0.078)
-    static let canvas = Color(red: 0.027, green: 0.035, blue: 0.055)
     static let panel = Color(red: 0.059, green: 0.071, blue: 0.110)
     static let panel2 = Color(red: 0.086, green: 0.106, blue: 0.157)
     static let well = Color(red: 0.047, green: 0.059, blue: 0.090)
@@ -13,7 +12,7 @@ enum LogXTheme {
     static let text = Color(red: 0.973, green: 0.980, blue: 0.988)
     static let text2 = Color(red: 0.796, green: 0.835, blue: 0.882)
     static let muted = Color(red: 0.580, green: 0.639, blue: 0.722)
-    static let muted2 = Color(red: 0.392, green: 0.455, blue: 0.545)
+    static let muted2 = Color(red: 0.470, green: 0.530, blue: 0.620)
 
     static let accent = Color(red: 0.388, green: 0.400, blue: 0.945)
     static let accentLight = Color(red: 0.506, green: 0.549, blue: 0.973) // #818CF8
@@ -22,7 +21,6 @@ enum LogXTheme {
     static let err = Color(red: 0.957, green: 0.247, blue: 0.369)
     static let method = Color(red: 0.220, green: 0.741, blue: 0.973)
     static let net = Color(red: 0.392, green: 0.455, blue: 0.545)
-    static let ember = accent // backwards compatibility
 
     static func methodColor(_ method: String) -> Color {
         switch method.uppercased() {
@@ -53,6 +51,7 @@ struct ConnectionDot: View {
     var pulsing: Bool
 
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -69,16 +68,17 @@ struct ConnectionDot: View {
         }
         .frame(width: 16, height: 16)
         .onAppear {
-            if pulsing { pulse = true }
+            if pulsing, !reduceMotion { pulse = true }
         }
         .onChange(of: pulsing) { _, on in
-            pulse = on
+            pulse = on && !reduceMotion
         }
         .animation(
-            pulsing
+            pulsing && !reduceMotion
                 ? .spring(response: 0.9, dampingFraction: 0.42).repeatForever(autoreverses: true)
                 : .spring(response: 0.28, dampingFraction: 0.86),
             value: pulse
         )
+        .accessibilityHidden(true)
     }
 }

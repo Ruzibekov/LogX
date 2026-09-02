@@ -38,12 +38,10 @@ public enum JSONFormat {
         if let data = s.data(using: .utf8),
            let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
             if (obj is [String: Any]) || (obj is [Any]) {
-                if #available(macOS 10.15, *) {
-                    if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
-                       let text = String(data: out, encoding: .utf8),
-                       !text.isEmpty {
-                        return text
-                    }
+                if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+                   let text = String(data: out, encoding: .utf8),
+                   !text.isEmpty {
+                    return text
                 }
                 if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]),
                    let text = String(data: out, encoding: .utf8),
@@ -194,11 +192,32 @@ public enum JSONFormat {
         if text.isEmpty { return [] }
         var spans: [JSONSpan] = []
         var i = text.startIndex
-        var expectingKey = false
-        var stack: [Bool] = []
 
         func push(_ start: String.Index, _ end: String.Index, _ kind: JSONSpanKind) {
             if start < end { spans.append(JSONSpan(String(text[start..<end]), kind)) }
+        }
+        func isWord(_ c: Character) -> Bool { c.isLetter || c.isNumber || c == "_" }
+        func boundary(_ idx: String.Index) -> Bool {
+            idx == text.startIndex || !isWord(text[text.index(before: idx)])
+        }
+        func numberStart(_ idx: String.Index) -> Bool {
+            guard boundary(idx) else { return false }
+            let c = text[idx]
+            if c.isNumber { return true }
+            guard c == "-" else { return false }
+            let next = text.index(after: idx)
+            return next < text.endIndex && text[next].isNumber
+        }
+        func keyword(_ idx: String.Index) -> String? {
+            guard boundary(idx) else { return nil }
+            for w in ["true", "false", "null"] where text[idx...].hasPrefix(w) {
+                let end = text.index(idx, offsetBy: w.count)
+                if end == text.endIndex || !isWord(text[end]) { return w }
+            }
+            return nil
+        }
+        func isPunct(_ c: Character) -> Bool {
+            c == "{" || c == "[" || c == "}" || c == "]" || c == ":" || c == ","
         }
 
         while i < text.endIndex {
@@ -224,43 +243,22 @@ public enum JSONFormat {
                 push(start, i, isKey ? .key : .string)
                 continue
             }
-            if ch == "{" || ch == "[" {
-                stack.append(ch == "{")
-                expectingKey = ch == "{"
+            if isPunct(ch) {
                 push(i, text.index(after: i), .punct)
                 i = text.index(after: i)
                 continue
             }
-            if ch == "}" || ch == "]" {
-                if !stack.isEmpty { stack.removeLast() }
-                expectingKey = stack.last == true
-                push(i, text.index(after: i), .punct)
-                i = text.index(after: i)
-                continue
-            }
-            if ch == ":" || ch == "," {
-                expectingKey = ch == "," && stack.last == true
-                push(i, text.index(after: i), .punct)
-                i = text.index(after: i)
-                continue
-            }
-            if ch.isNumber || ch == "-" {
+            if numberStart(i) {
                 let start = i
+                i = text.index(after: i)
                 while i < text.endIndex, "0123456789+-.eE".contains(text[i]) {
                     i = text.index(after: i)
                 }
                 push(start, i, .number)
                 continue
             }
-            if text[i...].hasPrefix("true") || text[i...].hasPrefix("null") {
-                let word = text[i...].hasPrefix("true") ? "true" : "null"
+            if let word = keyword(i) {
                 let end = text.index(i, offsetBy: word.count)
-                push(i, end, .boolNull)
-                i = end
-                continue
-            }
-            if text[i...].hasPrefix("false") {
-                let end = text.index(i, offsetBy: 5)
                 push(i, end, .boolNull)
                 i = end
                 continue
@@ -269,16 +267,11 @@ public enum JSONFormat {
             i = text.index(after: i)
             while i < text.endIndex {
                 let c = text[i]
-                if c == "\"" || c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == "," || c.isNumber || c == "-" {
-                    break
-                }
-                if text[i...].hasPrefix("true") || text[i...].hasPrefix("false") || text[i...].hasPrefix("null") {
-                    break
-                }
+                if c == "\"" || isPunct(c) { break }
+                if numberStart(i) || keyword(i) != nil { break }
                 i = text.index(after: i)
             }
             push(start, i, .plain)
-            _ = expectingKey
         }
         return mergePlain(spans)
     }
@@ -305,35 +298,34 @@ public enum JSONFormat {
         return spans
     }
 
-    public static func body(for log: NetworkLog, tab: DetailTab, redact: Bool = false) -> String {
+    /// `pretty == false` — tana serverdan kelgan shaklida (kalit tartibi, bo'shliq) ko'rsatiladi.
+    public static func body(for log: NetworkLog, tab: DetailTab, redact: Bool = false, pretty: Bool = true) -> String {
         switch tab {
         case .request:
-            let raw = pretty(log.requestBody)
-            return redact ? (Redactor.maskText(raw) ?? raw) : raw
+            return render(log.requestBody, redact: redact, pretty: pretty)
         case .response:
-            let raw = pretty(log.responseBody)
-            let text: String
-            if !raw.isEmpty {
-                text = raw
-            } else {
-                let fallbackMsg = [log.error, log.responseMessage, log.responseBodyMessage].compactMap { $0 }.first ?? ""
-                text = pretty(fallbackMsg)
-            }
-            return redact ? (Redactor.maskText(text) ?? text) : text
+            let raw = log.responseBody ?? ""
+            let source = raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? ([log.error, log.responseMessage, log.responseBodyMessage].compactMap { $0 }.first ?? "")
+                : raw
+            return render(source, redact: redact, pretty: pretty)
         case .headers:
             let request = redact ? Redactor.mask(log.requestHeaders) : log.requestHeaders
             let response = redact ? Redactor.mask(log.responseHeaders) : log.responseHeaders
             return headersText(request: request, response: response)
         case .params:
-            if log.queryParams.isEmpty { return "" }
-            return log.queryParams.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+            let params = redact ? Redactor.maskParams(log.queryParams) : log.queryParams
+            if params.isEmpty { return "" }
+            return params.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
         }
     }
 
-    public static func shareCaption(log: NetworkLog, tab: DetailTab) -> String {
-        let code = log.responseCode.map(String.init) ?? "NET"
-        let url = log.url.isEmpty ? log.api : log.url
-        return "LogX · \(log.method) \(code) · \(tab.title)\n\(url)"
+    private static func render(_ source: String?, redact: Bool, pretty: Bool) -> String {
+        if pretty {
+            return self.pretty(redact ? Redactor.redactBody(source) : source)
+        }
+        let text = (source ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return redact ? (Redactor.redactBody(text, preserveFormat: true) ?? text) : text
     }
 
     private static func mergePlain(_ spans: [JSONSpan]) -> [JSONSpan] {

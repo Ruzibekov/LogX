@@ -28,11 +28,12 @@ public enum SessionExport {
     }
 
     private static func item(for log: NetworkLog, redact: Bool) -> [String: Any] {
+        let rawURL = log.url.isEmpty ? log.api : log.url
         var out: [String: Any] = [
             "key": log.key,
             "method": log.method,
-            "url": log.url.isEmpty ? log.api : log.url,
-            "api": log.api,
+            "url": redact ? Redactor.maskURL(rawURL) : rawURL,
+            "api": redact ? Redactor.maskURL(log.api) : log.api,
             "host": log.hostLabel,
             "path": log.pathOnly,
         ]
@@ -56,7 +57,9 @@ public enum SessionExport {
     }
 
     private static func harEntry(for log: NetworkLog, redact: Bool) -> [String: Any] {
-        let url = log.url.isEmpty ? log.api : log.url
+        let rawURL = log.url.isEmpty ? log.api : log.url
+        let url = redact ? Redactor.maskURL(rawURL) : rawURL
+        let query = redact ? Redactor.maskParams(log.queryParams) : log.queryParams
         let reqHeaders = redact ? Redactor.mask(log.requestHeaders) : log.requestHeaders
         let resHeaders = redact ? Redactor.mask(log.responseHeaders) : log.responseHeaders
         let reqBody = redact ? Redactor.redactBody(log.requestBody) : log.requestBody
@@ -68,13 +71,13 @@ public enum SessionExport {
             "httpVersion": "HTTP/1.1",
             "cookies": [] as [Any],
             "headers": harHeaders(reqHeaders),
-            "queryString": harQuery(log.queryParams),
+            "queryString": harQuery(query),
             "headersSize": -1,
             "bodySize": reqBody?.utf8.count ?? 0,
         ]
         if let reqBody, !reqBody.isEmpty {
             request["postData"] = [
-                "mimeType": mime(reqHeaders) ?? "application/json",
+                "mimeType": mime(reqHeaders) ?? guessMime(reqBody),
                 "text": reqBody,
             ] as [String: Any]
         }
@@ -86,7 +89,7 @@ public enum SessionExport {
             "headers": harHeaders(resHeaders),
             "content": [
                 "size": resBody?.utf8.count ?? 0,
-                "mimeType": mime(resHeaders) ?? "application/json",
+                "mimeType": mime(resHeaders) ?? guessMime(resBody),
                 "text": resBody ?? "",
             ] as [String: Any],
             "redirectURL": "",
@@ -121,6 +124,14 @@ public enum SessionExport {
             if let cut, !cut.isEmpty { return cut }
         }
         return nil
+    }
+
+    static func guessMime(_ body: String?) -> String {
+        let t = (body ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if (t.hasPrefix("{") && t.hasSuffix("}")) || (t.hasPrefix("[") && t.hasSuffix("]")) {
+            return "application/json"
+        }
+        return "text/plain"
     }
 
     private static func isoNow() -> String {

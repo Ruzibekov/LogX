@@ -31,7 +31,7 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertFalse(src.contains("/api/network-logs"), src)
         XCTAssertFalse(src.contains("/api/demo-network-logs"), src)
         XCTAssertFalse(src.contains("func logDetail"), src)
-        XCTAssertTrue(src.contains("return []"), src)
+        XCTAssertFalse(src.contains("func logs("), src)
         let store = try source("Sources/LogX/Store.swift") + (try source("Sources/LogX/Store+Live.swift"))
         let live = try source("Sources/LogXCore/LiveStream.swift")
         XCTAssertFalse(store.contains("client.logs"), store)
@@ -51,13 +51,13 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertFalse(rail.contains("selectField"), rail)
     }
 
-    func testLoadDetailUsesDetailSeqGate() throws {
+    func testDetailFetchConceptRemoved() throws {
         let src = try source("Sources/LogX/Store.swift")
-        XCTAssertTrue(src.contains("private var detailSeq = DetailSeq()"), src)
-        XCTAssertTrue(src.contains("let seq = detailSeq.next()"), src)
-        XCTAssertTrue(src.contains("detailSeq.isCurrent(seq)"), src)
-        XCTAssertFalse(src.contains("detailSeq += 1"), src)
-        XCTAssertFalse(src.contains("if seq == detailSeq"), src)
+        XCTAssertFalse(src.contains("loadDetail"), src)
+        XCTAssertFalse(src.contains("selectedDetail"), src)
+        XCTAssertFalse(src.contains("DetailSeq"), src)
+        XCTAssertFalse(src.contains("selectedFieldId"), src)
+        XCTAssertTrue(src.contains("selectedIsHidden = !cachedVisibleKeys.contains(key)"), src)
     }
 
     func testListHeaderContextMenuAndLiveBar() throws {
@@ -71,7 +71,7 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertTrue(src.contains("RelativeTime.clock"), src)
         XCTAssertTrue(filters.contains("PATCH"), filters)
         XCTAssertTrue(filters.contains("Tozalash"), filters)
-        XCTAssertTrue(live.contains("skippedWhilePaused"), live)
+        XCTAssertTrue(live.contains("pendingWhilePausedCount"), live)
         XCTAssertTrue(live.contains("ConnectionDot"), live)
         XCTAssertTrue(src.contains("URL'ni nusxalash"), src)
         XCTAssertTrue(src.contains("cURL sifatida nusxalash"), src)
@@ -84,7 +84,7 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertTrue(live.contains("RelativeTime.label"), live)
         XCTAssertFalse(src.contains("selectApp(\"all\") {\n                    store.selectApp"), src)
         let rail = try source("Sources/LogX/Views/DeviceRail.swift")
-        XCTAssertTrue(rail.contains("ILLOVALAR"), rail)
+        XCTAssertTrue(rail.contains("ILOVALAR"), rail)
         XCTAssertTrue(rail.contains("liveApps"), rail)
         XCTAssertTrue(rail.contains("store.connection.title"), rail)
         XCTAssertTrue(rail.contains("store.connection.subtitle"), rail)

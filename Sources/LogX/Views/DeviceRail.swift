@@ -16,7 +16,7 @@ struct DeviceRail: View {
                                 subtitle: store.allLogs.isEmpty ? "jonli so'rov yo'q" : "\(store.allLogs.count) ta jonli",
                                 icon: "macbook.and.iphone",
                                 isOnline: store.hasLiveStream,
-                                selected: store.selectedSerial == nil && store.selectedFieldId == nil
+                                selected: store.selectedSerial == nil
                             ) {
                                 setScope { store.selectAllDevices() }
                             }
@@ -49,7 +49,7 @@ struct DeviceRail: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        sectionTitle("ILLOVALAR", icon: "square.grid.2x2")
+                        sectionTitle("ILOVALAR", icon: "square.grid.2x2")
                         VStack(spacing: 3) {
                             appRow(
                                 title: "Barcha ilovalar",
@@ -100,8 +100,8 @@ struct DeviceRail: View {
                                     .tracking(0.9)
                                     .foregroundStyle(store.favoritesOnly ? LogXTheme.text : LogXTheme.muted)
                                 Spacer()
-                                if !store.favoriteKeys.isEmpty {
-                                    Text("\(store.favoriteKeys.count)")
+                                if store.liveFavoriteCount > 0 {
+                                    Text("\(store.liveFavoriteCount)")
                                         .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                                         .padding(.horizontal, 7)
                                         .padding(.vertical, 2)

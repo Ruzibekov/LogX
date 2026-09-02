@@ -4,12 +4,15 @@ import LogXCore
 
 struct RequestDetail: View {
     @EnvironmentObject private var store: LogStore
-    @State private var tab: DetailTab = .response
     @State private var copied = false
     @State private var findQuery = ""
     @State private var findIndex = 0
     @AppStorage("logx.wrapBody") private var wrapBody = true
+    @AppStorage("logx.prettyBody") private var prettyBody = true
     @StateObject private var shareHost = SharePickerHost()
+    @State private var bodyCache: RenderedBody?
+
+    private var tab: DetailTab { store.detailTab }
 
     var body: some View {
         Group {
@@ -20,9 +23,12 @@ struct RequestDetail: View {
                     Image(systemName: "cursorarrow.click.2")
                         .font(.system(size: 32))
                         .foregroundStyle(LogXTheme.muted2)
-                    Text("So‘rov tanlang")
+                    Text("So'rov tanlang")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(LogXTheme.muted)
+                    Text("↑↓ bilan yuring, ⌘F qidiradi")
+                        .font(.system(size: 11))
+                        .foregroundStyle(LogXTheme.muted2)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -30,75 +36,127 @@ struct RequestDetail: View {
         .background(LogXTheme.panel)
     }
 
+    private func renderKey(_ log: NetworkLog) -> RenderedBody.Key {
+        RenderedBody.Key(
+            logKey: log.key,
+            tab: tab,
+            redact: store.redactEnabled,
+            pretty: prettyBody,
+            query: findQuery,
+            index: findIndex
+        )
+    }
+
     private func detail(_ log: NetworkLog) -> some View {
-        let body = JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled)
-        let display = body.isEmpty ? "—" : body
+        let key = renderKey(log)
+        let rendered = (bodyCache?.key == key) ? bodyCache : nil
+        let params = store.redactEnabled ? Redactor.maskParams(log.queryParams) : log.queryParams
         return VStack(alignment: .leading, spacing: 0) {
-            DetailHeader(
-                log: log,
-                tab: tab,
-                copied: copied,
-                onCopy: { copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled)) },
-                onShare: { share(log) }
-            )
+            DetailHeader(log: log, tab: tab)
+            if store.selectedIsHidden {
+                hiddenBanner
+            }
             Divider().overlay(LogXTheme.divider)
             tabBar(log: log)
             Divider().overlay(LogXTheme.divider)
-            DetailFindBar(query: $findQuery, index: $findIndex, display: display)
+            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.matchCount ?? 0)
             Divider().overlay(LogXTheme.divider)
-            ScrollView(wrapBody ? [.vertical] : [.vertical, .horizontal]) {
-                VStack(alignment: .leading, spacing: 0) {
-                    if tab == .params && !log.queryParams.isEmpty && findQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        paramsTable(log.queryParams)
-                    } else {
-                        jsonBody(display, headers: tab == .headers)
+            Group {
+                if tab == .params && !params.isEmpty && findQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ScrollView {
+                        paramsTable(params)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(bodyWell)
+                            .padding(10)
                     }
+                } else if let rendered {
+                    VStack(spacing: 0) {
+                        if let notice = rendered.truncationNotice {
+                            truncationStrip(notice)
+                        }
+                        BodyTextView(text: rendered.attributed, wrap: wrapBody, activeRange: rendered.activeRange)
+                    }
+                    .background(bodyWell)
+                    .padding(10)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(LogXTheme.well)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(LogXTheme.line, lineWidth: 1)
-                        )
-                )
-                .padding(10)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             actionBar(log)
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
+        }
+        .task(id: key) {
+            await render(log: log, key: key)
         }
         .onChange(of: store.selectedKey) { _, _ in
             findQuery = ""
             findIndex = 0
         }
-        .onChange(of: tab) { _, _ in
+        .onChange(of: store.detailTab) { _, _ in
             findIndex = 0
         }
     }
 
-    @ViewBuilder
-    private func jsonBody(_ display: String, headers: Bool) -> some View {
-        let matches = JSONFind.matches(display, query: findQuery)
-        let active = matches.isEmpty ? nil : min(max(findIndex, 0), matches.count - 1)
-        let text = Text(JSONHighlighter.attributedString(
-            for: display,
-            headers: headers,
-            highlights: matches,
-            activeIndex: active
-        ))
-            .textSelection(.enabled)
-            .lineSpacing(2)
-            .padding(.horizontal, 14)
-            .padding(.top, 16)
-            .padding(.bottom, 14)
-        if wrapBody {
-            text.frame(maxWidth: .infinity, alignment: .topLeading)
-        } else {
-            text.fixedSize(horizontal: true, vertical: false)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+    private var bodyWell: some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(LogXTheme.well)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(LogXTheme.line, lineWidth: 1)
+            )
+    }
+
+    /// Pretty-print, topish va rang berish asosiy oqimdan tashqarida; natija
+    /// kalit bo'yicha keshlanadi — jonli rejimda (20 Hz publish) qayta hisoblanmaydi.
+    private func render(log: NetworkLog, key: RenderedBody.Key) async {
+        if bodyCache?.key == key { return }
+        let next = await Task.detached(priority: .userInitiated) {
+            RenderedBody.make(log: log, key: key)
+        }.value
+        guard !Task.isCancelled else { return }
+        bodyCache = next
+    }
+
+    private var hiddenBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "eye.slash")
+                .font(.system(size: 10.5, weight: .semibold))
+            Text("Bu so'rov joriy filtr bilan ro'yxatda ko'rinmaydi")
+                .font(.system(size: 11, weight: .medium))
+            Spacer(minLength: 4)
+            Button("Filtrlarni tozalash") {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    store.clearFilters()
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(LogXTheme.accentLight)
         }
+        .foregroundStyle(LogXTheme.warn)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LogXTheme.warn.opacity(0.1))
+    }
+
+    private func truncationStrip(_ notice: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "scissors")
+                .font(.system(size: 10, weight: .semibold))
+            Text(notice)
+                .font(.system(size: 10.5, weight: .medium))
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(LogXTheme.muted)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(LogXTheme.panel2)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8))
     }
 
     private func paramsTable(_ params: [(key: String, value: String)]) -> some View {
@@ -117,7 +175,7 @@ struct RequestDetail: View {
             ForEach(DetailTab.allCases, id: \.self) { item in
                 Button {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        tab = item
+                        store.detailTab = item
                     }
                 } label: {
                     HStack(spacing: 5) {
@@ -146,29 +204,54 @@ struct RequestDetail: View {
                 .keyboardShortcut(tabShortcut(item), modifiers: .command)
             }
             Spacer()
-            Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                    wrapBody.toggle()
+            if tab == .request || tab == .response {
+                togglePill(
+                    on: !prettyBody,
+                    icon: "chevron.left.forwardslash.chevron.right",
+                    title: "Raw",
+                    help: prettyBody ? "Serverdan kelgan asl matnni ko'rsatish" : "Formatlangan JSON ko'rsatish",
+                    label: "Asl matn"
+                ) {
+                    prettyBody.toggle()
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: wrapBody ? "text.alignleft" : "arrow.left.and.right")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(wrapBody ? "Qator" : "Lenta")
-                        .font(.system(size: 10.5, weight: .semibold))
-                }
-                .foregroundStyle(wrapBody ? LogXTheme.text : LogXTheme.muted)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(wrapBody ? LogXTheme.accent.opacity(0.18) : Color.clear))
-                .overlay(Capsule().stroke(wrapBody ? LogXTheme.accent.opacity(0.45) : LogXTheme.line, lineWidth: 1))
             }
-            .buttonStyle(.plain)
-            .help(wrapBody ? "Uzun qatorni gorizontal aylanma qilish" : "Matnni oynaga sig'dirish")
+            togglePill(
+                on: wrapBody,
+                icon: wrapBody ? "text.alignleft" : "arrow.left.and.right",
+                title: "O'rash",
+                help: wrapBody ? "Uzun qatorni gorizontal aylanma qilish" : "Matnni oynaga sig'dirish",
+                label: "Qator o'rash"
+            ) {
+                wrapBody.toggle()
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(LogXTheme.well)
+    }
+
+    private func togglePill(on: Bool, icon: String, title: String, help: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                action()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 10.5, weight: .semibold))
+            }
+            .foregroundStyle(on ? LogXTheme.text : LogXTheme.muted)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(on ? LogXTheme.accent.opacity(0.18) : Color.clear))
+            .overlay(Capsule().stroke(on ? LogXTheme.accent.opacity(0.45) : LogXTheme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(label)
+        .accessibilityValue(on ? "yoqilgan" : "o'chirilgan")
     }
 
     private func tabShortcut(_ item: DetailTab) -> KeyEquivalent {
@@ -183,11 +266,12 @@ struct RequestDetail: View {
     private func actionBar(_ log: NetworkLog) -> some View {
         HStack(spacing: 12) {
             ActionPillButton(
-                title: "Nusxa",
-                shortcut: [.symbol("command"), .letter("C")],
-                isPrimary: true
+                title: copied ? "Nusxalandi" : "Nusxa",
+                shortcut: [.symbol("option"), .symbol("command"), .letter("C")],
+                isPrimary: true,
+                help: "Tanani nusxalash (⌥⌘C)"
             ) {
-                copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled))
+                copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled, pretty: prettyBody))
             }
 
             ActionPillButton(
@@ -199,7 +283,7 @@ struct RequestDetail: View {
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
 
-            ActionPillButton(title: "Ulashish", icon: "square.and.arrow.up") {
+            ActionPillButton(title: "Ulashish", icon: "square.and.arrow.up", help: "Rasm sifatida ulashish") {
                 share(log)
             }
 
@@ -227,7 +311,7 @@ struct RequestDetail: View {
                     store.redactEnabled ? LogXTheme.accent.opacity(0.5) : LogXTheme.line, lineWidth: 1
                 )
             )
-            .help("Yoqilsa ekran, cURL va ulashishda token yashiriladi")
+            .help("Yoqilsa ekran, ro'yxat, cURL, eksport va ulashishda token yashiriladi (⌘⇧T)")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -236,23 +320,172 @@ struct RequestDetail: View {
     }
 
     private func copy(_ text: String) {
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(text.isEmpty ? "—" : text, forType: .string)
+        CopyBox.plainText(text)
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
     }
 
     private func share(_ log: NetworkLog) {
-        guard let data = ShareCardRenderer.pngData(log: log, tab: tab, redact: store.redactEnabled) else { return }
-        let dir = FileManager.default.temporaryDirectory
+        guard let data = ShareCardRenderer.pngData(log: log, tab: tab, redact: store.redactEnabled) else {
+            store.presentError(title: "Rasm tayyorlanmadi", message: "Ulashish kartasi render bo'lmadi.")
+            return
+        }
+        let dir = ShareScratch.directory()
+        ShareScratch.purgeStale(in: dir)
         let url = dir.appendingPathComponent("logx-\(tab.rawValue)-\(Int(Date().timeIntervalSince1970)).png")
         do {
             try data.write(to: url, options: .atomic)
         } catch {
+            store.presentError(title: "Rasm saqlanmadi", message: error.localizedDescription)
             return
         }
         shareHost.present(url: url)
+    }
+}
+
+/// Bitta tabning tayyor ko'rinishi: matn, rangli NSAttributedString va topilmalar soni.
+struct RenderedBody {
+    struct Key: Equatable {
+        var logKey: String
+        var tab: DetailTab
+        var redact: Bool
+        var pretty: Bool
+        var query: String
+        var index: Int
+    }
+
+    /// Shundan katta tana ekranda qisqartiriladi (nusxa to'liq qoladi) — NSTextView
+    /// megabaytlik JSON'ni layout qilib UI'ni muzlatmasin.
+    static let displayLimitBytes = 512 * 1024
+
+    var key: Key
+    var text: String
+    var attributed: NSAttributedString
+    var matchCount: Int
+    var activeRange: NSRange?
+    var truncationNotice: String?
+
+    static func make(log: NetworkLog, key: Key) -> RenderedBody {
+        let body = JSONFormat.body(for: log, tab: key.tab, redact: key.redact, pretty: key.pretty)
+        var display = body.isEmpty ? "—" : body
+        var notice: String?
+        if display.utf8.count > displayLimitBytes {
+            let cut = String(decoding: display.utf8.prefix(displayLimitBytes), as: UTF8.self)
+            let hidden = display.utf8.count - cut.utf8.count
+            display = cut + "\n…"
+            notice = "Ekranda \(ByteSize.label(displayLimitBytes)) ko'rsatildi, \(ByteSize.label(hidden)) qisqartirildi — «Nusxa» to'liq tanani beradi."
+        }
+        let matches = JSONFind.matches(display, query: key.query)
+        let active = matches.isEmpty ? nil : min(max(key.index, 0), matches.count - 1)
+        let rendered = JSONHighlighter.nsAttributedString(
+            for: display,
+            headers: key.tab == .headers,
+            highlights: matches,
+            activeIndex: active
+        )
+        return RenderedBody(
+            key: key,
+            text: body,
+            attributed: rendered.text,
+            matchCount: matches.count,
+            activeRange: rendered.activeRange,
+            truncationNotice: notice
+        )
+    }
+}
+
+/// Tana matni NSTextView'da: tanlash, o'rash/gorizontal aylanma va faol topilmaga scroll.
+struct BodyTextView: NSViewRepresentable {
+    var text: NSAttributedString
+    var wrap: Bool
+    var activeRange: NSRange?
+
+    final class Coordinator {
+        var lastText: NSAttributedString?
+        var lastWrap: Bool?
+        var lastActive: NSRange?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+
+        let textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.usesFontPanel = false
+        textView.textContainerInset = NSSize(width: 12, height: 14)
+        textView.font = JSONHighlighter.bodyFont
+        textView.textColor = JSONHighlighter.nsColor(.plain)
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.setAccessibilityLabel("So'rov tanasi")
+        scroll.documentView = textView
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let textView = scroll.documentView as? NSTextView, let container = textView.textContainer else { return }
+        let coord = context.coordinator
+        if coord.lastWrap != wrap {
+            coord.lastWrap = wrap
+            if wrap {
+                container.widthTracksTextView = true
+                container.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+                textView.isHorizontallyResizable = false
+                textView.autoresizingMask = [.width]
+                scroll.hasHorizontalScroller = false
+            } else {
+                container.widthTracksTextView = false
+                container.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+                textView.isHorizontallyResizable = true
+                textView.autoresizingMask = []
+                scroll.hasHorizontalScroller = true
+            }
+        }
+        if coord.lastText !== text {
+            coord.lastText = text
+            textView.textStorage?.setAttributedString(text)
+            coord.lastActive = nil
+            if activeRange == nil {
+                textView.scroll(.zero)
+            }
+        }
+        if let activeRange, coord.lastActive != activeRange, activeRange.location + activeRange.length <= (textView.textStorage?.length ?? 0) {
+            coord.lastActive = activeRange
+            textView.scrollRangeToVisible(activeRange)
+        }
+    }
+}
+
+/// Ulashish PNG'lari alohida papkada turadi va bir soatdan eskilari o'chiriladi.
+enum ShareScratch {
+    static let maxAge: TimeInterval = 3600
+
+    static func directory() -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("LogX-share", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    static func purgeStale(in dir: URL, now: Date = Date()) {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        for item in items where item.pathExtension == "png" {
+            let modified = (try? item.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? now
+            if now.timeIntervalSince(modified) > maxAge {
+                try? fm.removeItem(at: item)
+            }
+        }
     }
 }
 
@@ -286,6 +519,7 @@ private struct ParamRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help(copied ? "Nusxalandi!" : "Qiymatni nusxalash")
+                .accessibilityLabel("\(key) qiymatini nusxalash")
             }
         }
         .padding(.horizontal, 12)

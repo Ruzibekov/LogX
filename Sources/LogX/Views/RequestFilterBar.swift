@@ -3,9 +3,11 @@ import LogXCore
 
 struct RequestFilterBar: View {
     @EnvironmentObject private var store: LogStore
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            searchField
             HStack(spacing: 8) {
                 statusSegment
                 Spacer(minLength: 8)
@@ -38,6 +40,56 @@ struct RequestFilterBar: View {
         .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.hideNoise)
         .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.slowOnly)
         .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.selectedHost)
+    }
+
+    /// Ro'yxat qidiruvi: host, URL, sarlavha, tana. ⌘F fokus, Esc tozalaydi.
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(searchFocused ? LogXTheme.accentLight : LogXTheme.muted2)
+            TextField("Host, URL, sarlavha, tana (⌘F)", text: Binding(
+                get: { store.query },
+                set: { store.applyQuery($0) }
+            ))
+            .textFieldStyle(.plain)
+            .font(.system(size: 11.5, design: .monospaced))
+            .foregroundStyle(LogXTheme.text)
+            .focused($searchFocused)
+            .accessibilityLabel("So'rovlarni qidirish")
+            .onExitCommand {
+                if store.query.isEmpty {
+                    searchFocused = false
+                } else {
+                    store.applyQuery("")
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: LogXNotice.focusListSearch)) { _ in
+                searchFocused = true
+            }
+            if !store.query.isEmpty {
+                Button {
+                    store.applyQuery("")
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(LogXTheme.muted2)
+                }
+                .buttonStyle(.plain)
+                .help("Qidiruvni tozalash (Esc)")
+                .accessibilityLabel("Qidiruvni tozalash")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(LogXTheme.well)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(searchFocused ? LogXTheme.accent.opacity(0.6) : LogXTheme.line, lineWidth: 1)
+                )
+        )
     }
 
     private var statusSegment: some View {
@@ -121,8 +173,8 @@ struct RequestFilterBar: View {
                 store.selectMethod(method)
             }
         } label: {
-            Text(method)
-                .font(.system(size: 9.5, weight: store.selectedMethod == method ? .bold : .medium, design: .monospaced))
+            Text(method == "ALL" ? "Hammasi" : method)
+                .font(.system(size: 10, weight: store.selectedMethod == method ? .bold : .medium, design: .monospaced))
                 .foregroundStyle(store.selectedMethod == method ? (method == "ALL" ? LogXTheme.text : LogXTheme.methodColor(method)) : LogXTheme.muted2)
                 .lineLimit(1)
                 .padding(.horizontal, 6)
@@ -140,7 +192,7 @@ struct RequestFilterBar: View {
                 store.toggleHideNoise()
             }
         } label: {
-            Text("Shovqin")
+            Text(store.hideNoise && store.noiseHiddenCount > 0 ? "Shovqin (\(store.noiseHiddenCount))" : "Shovqin")
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(store.hideNoise ? LogXTheme.accentLight : LogXTheme.muted)
                 .lineLimit(1)
@@ -151,7 +203,7 @@ struct RequestFilterBar: View {
                 .fixedSize()
         }
         .buttonStyle(LogXPressStyle())
-        .help("Analytics, health, ping va rasm so'rovlarini yashirish")
+        .help(store.hideNoise ? "Analytics, health, ping va rasm so'rovlari yashirilgan — bosib ko'rsating (⌥⌘N)" : "Analytics, health, ping va rasm so'rovlarini yashirish (⌥⌘N)")
     }
 
     private var slowPill: some View {

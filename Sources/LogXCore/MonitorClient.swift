@@ -5,6 +5,7 @@ public enum MonitorClientError: Error, Equatable, CustomStringConvertible {
     case http(Int)
     case decode
     case noDevice
+    case idle(Int)
 
     public var description: String {
         switch self {
@@ -12,6 +13,7 @@ public enum MonitorClientError: Error, Equatable, CustomStringConvertible {
         case .http(let code): return "HTTP \(code)"
         case .decode: return "Javob o‘qilmadi"
         case .noDevice: return "Ulangan device yo‘q"
+        case .idle(let seconds): return "Stream \(seconds) s jim — qayta ulanmoqda"
         }
     }
 }
@@ -50,11 +52,6 @@ public struct MonitorClient: Sendable {
         }
     }
 
-    public func logs(limit: Int = 400) async throws -> [NetworkLog] {
-        _ = limit
-        return []
-    }
-
     public func ensureServer(projectRoot: URL) async -> Bool {
         if await ping() { return true }
         let script = projectRoot.appendingPathComponent("tools/rsid-http-monitor/service.sh")
@@ -67,8 +64,7 @@ public struct MonitorClient: Sendable {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         do {
-            try process.run()
-            process.waitUntilExit()
+            try await runToExit(process)
         } catch {
             return false
         }
@@ -92,7 +88,20 @@ public struct MonitorClient: Sendable {
             if FileManager.default.fileExists(atPath: marker.path) { return url }
             url.deleteLastPathComponent()
         }
-        return URL(fileURLWithPath: "/Users/ruzibekov/Projects/online-mahalla")
+        return URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Projects/online-mahalla")
+    }
+
+    /// Jarayon tugashini kooperativ ipni band qilmasdan kutadi.
+    private func runToExit(_ process: Process) async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            process.terminationHandler = { _ in cont.resume() }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                cont.resume(throwing: error)
+            }
+        }
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {

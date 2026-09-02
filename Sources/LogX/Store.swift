@@ -6,17 +6,17 @@ final class LogStore: ObservableObject {
     @Published var devices: [ConnectedDevice] = []
     @Published var apps: [AppProfile] = AppProfile.builtIn
     @Published var selectedSerial: String?
-    @Published var selectedFieldId: String?
     @Published var selectedAppId: String = "all"
     @Published var status: StatusClass = .all
     @Published var query: String = ""
     @Published var favoritesOnly = false
+    /// Sevimlilar kalit xeshi bilan saqlanadi (kalit ichida to'liq URL bor).
     @Published var favoriteKeys: Set<String> = Set(
-        UserDefaults.standard.stringArray(forKey: "logx.favorites") ?? []
+        UserDefaults.standard.stringArray(forKey: "logx.favoriteHashes") ?? []
     )
     @Published private(set) var allLogs: [NetworkLog] = []
     @Published var selectedKey: String?
-    @Published var selectedDetail: NetworkLog?
+    @Published var detailTab: DetailTab = .response
     @Published var serverOK = false
     @Published var banner: String?
     @Published var isLoading = true
@@ -28,7 +28,16 @@ final class LogStore: ObservableObject {
     @Published var slowOnly = false
     @Published var selectedHost: String?
     @Published var lastActivityTs: Double?
-    @Published var skippedWhilePaused = 0
+    /// Pauza paytida kelgan loglar tashlanmaydi — buferda turadi, davom etilganda kiradi.
+    @Published var pendingWhilePaused: [NetworkLog] = []
+    /// Tanlangan so'rov hozirgi filtr bilan ro'yxatda ko'rinmayapti.
+    @Published var selectedIsHidden = false
+    /// Pidlar noma'lum bo'lib qolgan streak — server pid xaritasi eskirgan (ilova qayta ochilgan).
+    var unknownAppStreak: [String: Int] = [:]
+    var lastUnknownReopen: [String: Date] = [:]
+    var refreshFailures = 0
+    var clearedKeys: Set<String> = []
+    var clearedSnapshot: [String: NetworkLog] = [:]
     @Published var connection: AppConnection = .booting
     @Published var streamHealthBySerial: [String: StreamHealth] = [:]
     @Published var redactEnabled = UserDefaults.standard.bool(forKey: "logx.redact") {
@@ -36,20 +45,32 @@ final class LogStore: ObservableObject {
     }
 
     let maxLogCapacity = 2500
+    static let unknownStreakLimit = 5
+    static let unknownReopenThrottle: TimeInterval = 30
+    static let serverDownAfterFailures = 2
+    static let queryDebounce: TimeInterval = 0.12
+    static let serverStartRetryInterval: TimeInterval = 30
     var client = MonitorClient()
     var liveTasks: [String: Task<Void, Never>] = [:]
     var pollTask: Task<Void, Never>?
+    var queryTask: Task<Void, Never>?
     var startGeneration = 0
     var liveByKey: [String: NetworkLog] = [:]
     var apiApps: [AppProfile] = AppProfile.builtIn
-    private var detailSeq = DetailSeq()
+    var lastServerStartAttempt: Date?
 
     var cachedVisibleLogs: [NetworkLog] = []
+    var cachedVisibleKeys: Set<String> = []
     var cachedStatusCounts: [StatusClass: Int] = [:]
     var cachedErrorCount: Int = 0
     var cachedLiveApps: [(app: AppProfile, count: Int)] = []
     var cachedUniqueHosts: [String] = []
     var cachedEndpointCounts: [String: Int] = [:]
+    var cachedScopedCount: Int = 0
+    var cachedNoiseHiddenCount: Int = 0
+    var cachedLiveFavoriteCount: Int = 0
+    var queryMatchCache: [String: Bool] = [:]
+    var queryMatchCacheFor: String = ""
 
     init() {
         let prefs = InspectorPrefs.load()
@@ -63,21 +84,8 @@ final class LogStore: ObservableObject {
         selectedSerial = prefs.selectedSerial
     }
 
-    var selectedDevice: ConnectedDevice? {
-        devices.first(where: { $0.serial == selectedSerial })
-    }
-
-    var fieldDevices: [FieldDevice] {
-        FieldDevices.collect(allLogs)
-    }
-
     var selectedScope: DeviceScope {
-        DeviceScope.resolved(
-            usbSerial: selectedSerial,
-            fieldId: selectedFieldId,
-            devices: devices,
-            fields: fieldDevices
-        ).scope
+        DeviceScope.resolved(usbSerial: selectedSerial, devices: devices).scope
     }
 
     var visibleLogs: [NetworkLog] {
@@ -95,6 +103,15 @@ final class LogStore: ObservableObject {
     var liveApps: [(app: AppProfile, count: Int)] {
         cachedLiveApps
     }
+
+    /// Joriy qurilma+ilova doirasidagi so'rovlar soni (filtrlardan oldin).
+    var scopedLogCount: Int { cachedScopedCount }
+
+    /// Shovqin filtri yashirgan so'rovlar soni (joriy doirada).
+    var noiseHiddenCount: Int { cachedNoiseHiddenCount }
+
+    /// Hozir ro'yxatda mavjud sevimlilar soni — eski sessiya kalitlari sanalmaydi.
+    var liveFavoriteCount: Int { cachedLiveFavoriteCount }
 
     func isStreamLive(serial: String) -> Bool {
         streamHealthBySerial[serial]?.isLive == true
@@ -123,9 +140,18 @@ final class LogStore: ObservableObject {
 
     func togglePause() {
         isPaused.toggle()
-        if !isPaused { skippedWhilePaused = 0 }
+        if !isPaused, !pendingWhilePaused.isEmpty {
+            let buffered = pendingWhilePaused
+            pendingWhilePaused = []
+            ingestBatch(buffered)
+        }
         publishConnection()
     }
+
+    var pendingWhilePausedCount: Int { pendingWhilePaused.count }
+
+    /// Log xotira sig'imiga yaqin — eng eskilari tushib ketadi.
+    var isNearCapacity: Bool { liveByKey.count >= maxLogCapacity * 9 / 10 }
 
     func toggleErrorsOnly() {
         errorsOnly.toggle()
@@ -135,19 +161,62 @@ final class LogStore: ObservableObject {
         persistPrefs()
     }
 
+    /// Tozalash: kalitlar «suv belgisi» sifatida eslab qolinadi — qayta ulanishda
+    /// serverning tail'i ularni qaytarsa ham ro'yxatga tushmaydi. Bekor qilish mumkin.
     func clearLogs() {
+        guard !liveByKey.isEmpty || !pendingWhilePaused.isEmpty else { return }
+        clearedSnapshot.merge(liveByKey) { _, new in new }
+        for item in pendingWhilePaused { clearedSnapshot[item.key] = item }
+        if clearedKeys.count > maxLogCapacity * 2 { clearedKeys.removeAll() }
+        clearedKeys.formUnion(liveByKey.keys)
+        clearedKeys.formUnion(pendingWhilePaused.map(\.key))
         liveByKey.removeAll()
-        skippedWhilePaused = 0
+        pendingWhilePaused = []
+        lastActivityTs = nil
         rebuildFromLive()
         selectedKey = nil
-        selectedDetail = nil
+        selectedIsHidden = false
     }
 
-    var selectedLog: NetworkLog? {
-        if let selectedKey, let hit = visibleLogs.first(where: { $0.key == selectedKey }) {
-            return selectedDetail?.key == hit.key ? (selectedDetail ?? hit) : hit
+    var canUndoClear: Bool { !clearedSnapshot.isEmpty }
+
+    func undoClear() {
+        guard canUndoClear else { return }
+        for (key, log) in clearedSnapshot where liveByKey[key] == nil {
+            liveByKey[key] = log
         }
-        return visibleLogs.first
+        clearedSnapshot = [:]
+        clearedKeys = []
+        lastActivityTs = liveByKey.values.compactMap(\.ts).max()
+        rebuildFromLive()
+        reconcileSelection()
+    }
+
+    /// Tanlangan so'rov — filtr uni yashirgan bo'lsa ham qaytadi (`selectedIsHidden` bilan).
+    var selectedLog: NetworkLog? {
+        guard let selectedKey else { return nil }
+        return liveByKey[selectedKey]
+    }
+
+    func clearSelection() {
+        selectedKey = nil
+    }
+
+    /// Nusxalash/ko'rsatish uchun URL — «Tokenlar» yoqiq bo'lsa query'dagi sezgir qiymatlar yashirin.
+    func shareableURL(_ log: NetworkLog) -> String {
+        let raw = log.url.isEmpty ? log.api : log.url
+        return redactEnabled ? Redactor.maskURL(raw) : raw
+    }
+
+    /// Ro'yxatdagi yo'l (`/path?query`) — redakt yoqiq bo'lsa query qiymatlari yashirin.
+    func displayPath(_ log: NetworkLog) -> String {
+        redactEnabled ? Redactor.maskURL(log.pathLabel) : log.pathLabel
+    }
+
+    /// Joriy tab tanasini (redakt holatiga mos) nusxalaydi; menyu ⌥⌘C shu yerga keladi.
+    func copySelectedBody() {
+        guard let log = selectedLog else { return }
+        CopyBox.plainText(JSONFormat.body(for: log, tab: detailTab, redact: redactEnabled))
     }
 
     func start() async {
@@ -156,6 +225,7 @@ final class LogStore: ObservableObject {
         isLoading = true
         cancelLiveWork()
         publishConnection()
+        lastServerStartAttempt = Date()
         serverOK = await client.ensureServer(projectRoot: MonitorClient.projectRoot())
         guard gen == startGeneration, !Task.isCancelled else { return }
         if !serverOK {
@@ -178,6 +248,7 @@ final class LogStore: ObservableObject {
         status = .all
         selectedMethod = "ALL"
         query = ""
+        queryTask?.cancel()
         errorsOnly = false
         if favoritesOnly { favoritesOnly = false }
         slowOnly = false
@@ -202,59 +273,36 @@ final class LogStore: ObservableObject {
             }
             serverOK = true
 
+            refreshFailures = 0
+
             if devicesChanged || appsChanged || full || allLogs.isEmpty {
                 rebuildFromLive()
-                let pruned = DeviceScope.resolved(
-                    usbSerial: selectedSerial,
-                    fieldId: selectedFieldId,
-                    devices: devices,
-                    fields: fieldDevices
-                )
-                selectedSerial = pruned.usbSerial
-                selectedFieldId = pruned.fieldId
+                selectedSerial = DeviceScope.resolved(usbSerial: selectedSerial, devices: devices).usbSerial
             }
 
             syncLiveStreams()
-
-            if full, selectedKey == nil {
-                selectedKey = visibleLogs.first?.key
-            }
             reconcileSelection()
-            if let key = selectedKey, selectedDetail?.key != key || selectedDetail?.isFull != true {
-                await loadDetail(key)
-            }
-            banner = nil
+            if banner != nil, !bannerIsStreamNotice { banner = nil }
             publishConnection()
         } catch {
-            serverOK = false
-            banner = (error as? MonitorClientError)?.description ?? String(describing: error)
-            syncLiveStreams()
-            publishConnection()
+            refreshFailures += 1
+            if refreshFailures >= LogStore.serverDownAfterFailures || !serverOK {
+                markServerDown(error)
+            }
         }
     }
 
     func selectDevice(_ serial: String?) {
-        guard selectedSerial != serial || selectedFieldId != nil else { return }
+        guard selectedSerial != serial else { return }
         selectedSerial = serial
-        selectedFieldId = nil
         recomputeDerivedState()
         reconcileSelection()
         persistPrefs()
     }
 
-    func selectField(_ id: String?) {
-        guard selectedFieldId != id || selectedSerial != nil else { return }
-        selectedFieldId = id
-        selectedSerial = nil
-        recomputeDerivedState()
-        reconcileSelection()
-    }
-
     func selectAllDevices() {
-        guard selectedSerial != nil || selectedFieldId != nil || favoritesOnly else { return }
+        guard selectedSerial != nil else { return }
         selectedSerial = nil
-        selectedFieldId = nil
-        favoritesOnly = false
         recomputeDerivedState()
         reconcileSelection()
         persistPrefs()
@@ -266,14 +314,21 @@ final class LogStore: ObservableObject {
         reconcileSelection()
     }
 
+    func isFavorite(_ key: String) -> Bool {
+        favoriteKeys.contains(FavoriteKey.hash(key))
+    }
+
     func toggleFavorite(_ key: String) {
-        if favoriteKeys.contains(key) {
-            favoriteKeys.remove(key)
+        let h = FavoriteKey.hash(key)
+        if favoriteKeys.contains(h) {
+            favoriteKeys.remove(h)
         } else {
-            favoriteKeys.insert(key)
+            favoriteKeys.insert(h)
         }
-        UserDefaults.standard.set(Array(favoriteKeys), forKey: "logx.favorites")
+        favoriteKeys = FavoriteKey.prune(favoriteKeys, live: Set(liveByKey.keys.map(FavoriteKey.hash)))
+        UserDefaults.standard.set(Array(favoriteKeys), forKey: "logx.favoriteHashes")
         recomputeDerivedState()
+        if favoritesOnly { reconcileSelection() }
     }
 
     func selectApp(_ id: String) {
@@ -299,40 +354,46 @@ final class LogStore: ObservableObject {
         persistPrefs()
     }
 
+    /// Qidiruv matni darhol saqlanadi, og'ir filtr (body qidiruvi) esa
+    /// yozish to'xtagach bir marta hisoblanadi.
     func applyQuery(_ next: String) {
         query = next
-        recomputeDerivedState()
-        reconcileSelection()
-    }
-
-    func reconcileSelection() {
-        if let key = selectedKey, visibleLogs.contains(where: { $0.key == key }) {
-            if selectedDetail?.key != key || selectedDetail?.isFull != true {
-                Task { await loadDetail(key) }
-            }
+        queryTask?.cancel()
+        if next.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            recomputeDerivedState()
+            reconcileSelection()
             return
         }
-        let nextKey = visibleLogs.first?.key
-        if selectedKey != nextKey {
-            selectedKey = nextKey
-            selectedDetail = nil
-            if let key = selectedKey {
-                Task { await loadDetail(key) }
-            }
+        queryTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(LogStore.queryDebounce * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.recomputeDerivedState()
+            self.reconcileSelection()
         }
+    }
+
+    /// Tanlov o'z-o'zidan boshqa qatorga sakramaydi: log o'chib ketgan bo'lsa
+    /// tanlov bo'shaydi, filtr yashirgan bo'lsa «yashirin» belgisi bilan qoladi.
+    func reconcileSelection() {
+        guard let key = selectedKey else {
+            selectedIsHidden = false
+            return
+        }
+        if liveByKey[key] == nil {
+            selectedKey = nil
+            selectedIsHidden = false
+            return
+        }
+        selectedIsHidden = !cachedVisibleKeys.contains(key)
     }
 
     func selectLog(_ log: NetworkLog) {
-        followLatest = false
+        if followLatest {
+            followLatest = false
+            persistPrefs()
+        }
         selectedKey = log.key
-        persistPrefs()
-        Task { await loadDetail(log.key) }
-    }
-
-    func loadDetail(_ key: String) async {
-        let seq = detailSeq.next()
-        let local = liveByKey[key] ?? allLogs.first(where: { $0.key == key })
-        if detailSeq.isCurrent(seq) { selectedDetail = local }
+        selectedIsHidden = !cachedVisibleKeys.contains(log.key)
     }
 
     func rebuildFromLive() {

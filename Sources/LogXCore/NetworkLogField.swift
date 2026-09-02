@@ -7,30 +7,4 @@ extension NetworkLog {
             .first { !$0.isEmpty }
         return raw ?? "—"
     }
-
-    public var fieldDeviceId: String {
-        let header = requestHeaders["device-id"]
-            ?? requestHeaders["Device-Id"]
-            ?? requestHeaders["x-device-id"]
-        if let header, !header.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return header.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return fieldDeviceLabel.lowercased()
-    }
-
-    public var hostLabel: String {
-        let raw = url.isEmpty ? api : url
-        return URL(string: raw)?.host ?? ""
-    }
-
-    public var pathOnly: String {
-        let raw = url.isEmpty ? api : url
-        if let parsed = URL(string: raw) {
-            if !parsed.path.isEmpty { return parsed.path }
-        }
-        if let q = raw.firstIndex(of: "?") {
-            return String(raw[..<q])
-        }
-        return raw
-    }
 }

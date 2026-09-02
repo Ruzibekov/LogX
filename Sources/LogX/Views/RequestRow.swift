@@ -34,21 +34,22 @@ struct RequestRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 if !log.hostLabel.isEmpty {
                     Text(log.hostLabel)
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(LogXTheme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
                 HStack(spacing: 6) {
-                    Text(log.pathLabel)
+                    Text(store.displayPath(log))
                         .font(.system(size: 11.5, weight: selected ? .medium : .regular, design: .monospaced))
                         .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    if store.repeatCount(for: log) > 1 {
-                        Text("×\(store.repeatCount(for: log))")
-                            .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                    let repeats = store.repeatCount(for: log)
+                    if repeats > 1 {
+                        Text("×\(repeats)")
+                            .font(.system(size: 9, weight: .heavy, design: .monospaced))
                             .foregroundStyle(LogXTheme.accentLight)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1.5)
@@ -58,7 +59,7 @@ struct RequestRow: View {
 
                     if RelativeTime.isFresh(ts: log.ts, now: now) {
                         Text("YANGI")
-                            .font(.system(size: 8, weight: .heavy))
+                            .font(.system(size: 9, weight: .heavy))
                             .tracking(0.7)
                             .foregroundStyle(LogXTheme.ok)
                             .padding(.horizontal, 4)
@@ -68,7 +69,7 @@ struct RequestRow: View {
 
                     if hovered || copied {
                         Button {
-                            CopyBox.plainText(log.url.isEmpty ? log.api : log.url)
+                            CopyBox.plainText(store.shareableURL(log))
                             copied = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
                         } label: {
@@ -78,12 +79,13 @@ struct RequestRow: View {
                         }
                         .buttonStyle(.plain)
                         .help(copied ? "Nusxalandi!" : "URL nusxalash")
+                        .accessibilityLabel("URL nusxalash")
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(duration)
+            Text(log.formattedDuration)
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(durationColor)
                 .frame(width: 58, alignment: .trailing)
@@ -100,8 +102,10 @@ struct RequestRow: View {
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1.5)
                 .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 3.5))
-                .frame(width: 58, alignment: .trailing)
+                .frame(width: 76, alignment: .trailing)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .help(log.appLabel)
 
             hoverStar.frame(width: 24, alignment: .trailing)
         }
@@ -114,29 +118,24 @@ struct RequestRow: View {
 
     @ViewBuilder
     private var hoverStar: some View {
-        if hovered || store.favoriteKeys.contains(log.key) {
+        if hovered || store.isFavorite(log.key) {
             Button {
                 store.toggleFavorite(log.key)
             } label: {
-                Image(systemName: store.favoriteKeys.contains(log.key) ? "star.fill" : "star")
+                Image(systemName: store.isFavorite(log.key) ? "star.fill" : "star")
                     .font(.system(size: 10.5))
-                    .foregroundStyle(store.favoriteKeys.contains(log.key) ? LogXTheme.warn : LogXTheme.muted2)
+                    .foregroundStyle(store.isFavorite(log.key) ? LogXTheme.warn : LogXTheme.muted2)
             }
             .buttonStyle(.plain)
             .help("Sevimli")
+            .accessibilityLabel(store.isFavorite(log.key) ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish")
         }
-    }
-
-    private var duration: String {
-        guard let ms = log.durationMs else { return "—" }
-        if ms >= 1000 { return String(format: "%.1f s", Double(ms) / 1000) }
-        return "\(ms) ms"
     }
 
     private var durationColor: Color {
         guard let ms = log.durationMs else { return LogXTheme.muted2 }
-        if ms >= 3000 { return LogXTheme.err }
-        if ms >= 800 { return LogXTheme.warn }
+        if ms >= LogNoise.verySlowThresholdMs { return LogXTheme.err }
+        if ms >= LogNoise.slowThresholdMs { return LogXTheme.warn }
         return LogXTheme.muted
     }
 }

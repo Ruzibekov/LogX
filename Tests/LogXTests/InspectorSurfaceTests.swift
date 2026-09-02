@@ -31,20 +31,23 @@ final class InspectorSurfaceTests: XCTestCase {
 
     func testJSONHighlighterDoesNotClipViaNSAttributedString() throws {
         let hl = try source("Sources/LogX/Views/JSONHighlighter.swift")
-        XCTAssertFalse(hl.contains("NSMutableAttributedString"), hl)
+        XCTAssertTrue(hl.contains("static func nsAttributedString("), hl)
+        XCTAssertTrue(hl.contains("activeRange"), hl)
         XCTAssertTrue(hl.contains("AttributedString()"), hl)
         XCTAssertTrue(hl.contains("120_000"), hl)
         XCTAssertTrue(hl.contains("highlights"), hl)
         let detail = try source("Sources/LogX/Views/RequestDetail.swift")
-        XCTAssertTrue(detail.contains("padding(.top, 16)"), detail)
+        XCTAssertTrue(detail.contains("BodyTextView"), detail)
+        XCTAssertTrue(detail.contains("scrollRangeToVisible"), detail)
         XCTAssertTrue(detail.contains("Tokenlar"), detail)
         XCTAssertFalse(detail.contains("Yashirish"), detail)
     }
 
     func testSearchPromptFitsToolbar() throws {
+        let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
+        XCTAssertTrue(filters.contains("Host, URL, sarlavha, tana (⌘F)"), filters)
         let content = try source("Sources/LogX/Views/ContentView.swift")
-        XCTAssertTrue(content.contains("Host, URL, body"), content)
-        XCTAssertFalse(content.contains("header…"), content)
+        XCTAssertFalse(content.contains(".searchable("), content)
     }
 
     func testSidebarToggleDoesNotLockLayout() throws {

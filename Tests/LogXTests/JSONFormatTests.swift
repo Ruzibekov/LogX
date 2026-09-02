@@ -62,9 +62,6 @@ final class JSONFormatTests: XCTestCase {
         XCTAssertTrue(headers.contains("Server: nginx"))
         XCTAssertTrue(JSONFormat.body(for: log, tab: .request).contains("\"a\""))
         XCTAssertTrue(JSONFormat.body(for: log, tab: .response).contains("error"))
-        let cap = JSONFormat.shareCaption(log: log, tab: .response)
-        XCTAssertTrue(cap.contains("POST 400"))
-        XCTAssertTrue(cap.contains("Javob"))
     }
 
     func testBodyRedactMasksHeadersAndBearer() {

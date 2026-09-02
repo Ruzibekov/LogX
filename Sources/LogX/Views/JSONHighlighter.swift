@@ -46,6 +46,48 @@ enum JSONHighlighter {
         return result
     }
 
+    static let bodyFont = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+
+    /// NSTextView uchun: rangli matn + faol topilma diapazoni (scroll uchun).
+    static func nsAttributedString(
+        for text: String,
+        headers: Bool,
+        highlights: [Range<String.Index>] = [],
+        activeIndex: Int? = nil
+    ) -> (text: NSAttributedString, activeRange: NSRange?) {
+        let spans: [JSONSpan]
+        if headers {
+            spans = JSONFormat.highlightHeaders(text)
+        } else if text.count > 120_000 {
+            let prefixIndex = text.index(text.startIndex, offsetBy: 100_000)
+            spans = JSONFormat.highlight(String(text[..<prefixIndex])) + [JSONSpan(String(text[prefixIndex...]), .plain)]
+        } else {
+            spans = JSONFormat.highlight(text)
+        }
+        let result = NSMutableAttributedString()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 2
+        for span in spans {
+            result.append(NSAttributedString(string: span.text, attributes: [
+                .font: bodyFont,
+                .foregroundColor: nsColor(span.kind),
+                .paragraphStyle: paragraph,
+            ]))
+        }
+        var active: NSRange?
+        if !highlights.isEmpty {
+            let warnBg = NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 0.38)
+            let accentBg = NSColor(srgbRed: 0.388, green: 0.400, blue: 0.945, alpha: 0.28)
+            for (i, range) in highlights.enumerated() {
+                let nsRange = NSRange(range, in: text)
+                guard nsRange.location != NSNotFound, nsRange.location + nsRange.length <= result.length else { continue }
+                result.addAttribute(.backgroundColor, value: i == activeIndex ? warnBg : accentBg, range: nsRange)
+                if i == activeIndex { active = nsRange }
+            }
+        }
+        return (result, active)
+    }
+
     static func nsColor(_ kind: JSONSpanKind) -> NSColor {
         switch kind {
         case .key: return NSColor(srgbRed: 0.063, green: 0.725, blue: 0.506, alpha: 1)

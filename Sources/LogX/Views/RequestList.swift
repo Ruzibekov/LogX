@@ -29,7 +29,7 @@ struct RequestList: View {
     }
 
     private var listScope: String {
-        "\(store.selectedAppId)|\(store.selectedSerial ?? "")|\(store.selectedFieldId ?? "")"
+        "\(store.selectedAppId)|\(store.selectedSerial ?? "")"
     }
 
     private var columnHeader: some View {
@@ -39,7 +39,7 @@ struct RequestList: View {
             Text("MANZIL").frame(maxWidth: .infinity, alignment: .leading)
             Text("DAVOM").frame(width: 58, alignment: .trailing)
             Text("QACHON").frame(width: 58, alignment: .trailing)
-            Text("ILOVA").frame(width: 58, alignment: .trailing)
+            Text("ILOVA").frame(width: 76, alignment: .trailing)
             Color.clear.frame(width: 24, height: 1)
         }
         .font(.system(size: 9.5, weight: .bold))
@@ -77,16 +77,20 @@ struct RequestList: View {
 
     @ViewBuilder
     private func rowMenu(_ log: NetworkLog) -> some View {
-        Button("URL'ni nusxalash") { CopyBox.plainText(log.url.isEmpty ? log.api : log.url) }
+        Button("URL'ni nusxalash") { CopyBox.plainText(store.shareableURL(log)) }
         Button("Qatorni nusxalash") {
-            CopyBox.plainText("\(log.method) \(log.hostLabel) \(log.pathLabel) \(log.appShortLabel) \(RelativeTime.clock(ts: log.ts))")
+            CopyBox.plainText("\(log.method) \(log.hostLabel) \(store.displayPath(log)) \(log.appShortLabel) \(RelativeTime.clock(ts: log.ts))")
         }
-        Button("Yo'lni nusxalash") { CopyBox.plainText(log.pathLabel) }
+        Button("Yo'lni nusxalash") { CopyBox.plainText(store.displayPath(log)) }
         Button("cURL sifatida nusxalash") {
             CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
         }
-        Button("So'rov bodyni nusxalash") { CopyBox.plainText(log.requestBody ?? "") }
-        Button("Javobni nusxalash") { CopyBox.plainText(log.responseBody ?? "") }
+        Button("So'rov bodyni nusxalash") {
+            CopyBox.plainText(store.redactEnabled ? (Redactor.redactBody(log.requestBody) ?? "") : (log.requestBody ?? ""))
+        }
+        Button("Javobni nusxalash") {
+            CopyBox.plainText(store.redactEnabled ? (Redactor.redactBody(log.responseBody) ?? "") : (log.responseBody ?? ""))
+        }
         Button("Sarlavhalarni nusxalash") {
             let req = store.redactEnabled ? Redactor.mask(log.requestHeaders) : log.requestHeaders
             let res = store.redactEnabled ? Redactor.mask(log.responseHeaders) : log.responseHeaders
@@ -97,7 +101,7 @@ struct RequestList: View {
             CopyBox.plainText(String(data: data, encoding: .utf8) ?? "")
         }
         Divider()
-        Button(store.favoriteKeys.contains(log.key) ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish") {
+        Button(store.isFavorite(log.key) ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish") {
             store.toggleFavorite(log.key)
         }
     }

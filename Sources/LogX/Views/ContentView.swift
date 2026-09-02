@@ -60,7 +60,8 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help(store.isPaused ? "Davom ettirish (⌘P)" : "Pauza — yangi so'rovlar qabul qilinmaydi (⌘P)")
+                .help(store.isPaused ? "Davom ettirish (⌘P)" : "Pauza — yangi so'rovlar buferda to'planadi (⌘P)")
+                .accessibilityLabel(store.isPaused ? "Davom ettirish" : "Pauza")
                 .keyboardShortcut("p", modifiers: .command)
 
                 Button {
@@ -82,7 +83,9 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help(store.followLatest ? "Kuzat yoqilgan — yangi so'rov tanlanadi" : "Kuzat — yangi so'rovni tanlash")
+                .help(store.followLatest ? "Kuzat yoqilgan — yangi so'rov tanlanadi (⌘L)" : "Kuzat — yangi so'rovni tanlash (⌘L)")
+                .accessibilityLabel("Kuzat")
+                .accessibilityValue(store.followLatest ? "yoqilgan" : "o'chirilgan")
 
                 Menu {
                     Button("HAR saqlash") { store.exportHAR() }
@@ -90,7 +93,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.down")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(LogXTheme.muted)
+                        .foregroundStyle(store.canExport ? LogXTheme.muted : LogXTheme.muted2)
                         .frame(width: 26, height: 26)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -102,7 +105,9 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help("Saqlash — HAR yoki JSON")
+                .disabled(!store.canExport)
+                .help(store.canExport ? "Saqlash — ko'rinadigan sessiya HAR yoki JSON" : "Saqlash uchun ko'rinadigan so'rov yo'q")
+                .accessibilityLabel("Sessiyani saqlash")
 
                 Button {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
@@ -123,19 +128,14 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .disabled(store.allLogs.isEmpty)
                 .help("Ro'yxatni tozalash (⌘K)")
+                .accessibilityLabel("Ro'yxatni tozalash")
                 .keyboardShortcut("k", modifiers: .command)
             }
         }
-        .searchable(
-            text: Binding(
-                get: { store.query },
-                set: { store.applyQuery($0) }
-            ),
-            prompt: "Host, URL, body"
-        )
         .onExitCommand {
-            store.selectedKey = nil
+            store.clearSelection()
         }
     }
 
@@ -155,4 +155,10 @@ struct ContentView: View {
             : (store.apps.first(where: { $0.id == store.selectedAppId })?.shortLabel ?? store.selectedAppId)
         return "\(device) · \(app)"
     }
+}
+
+/// Menyu → ko'rinish fokus buyruqlari (⌘F ro'yxat qidiruvi, ⌥⌘F JSON topish).
+enum LogXNotice {
+    static let focusListSearch = Notification.Name("logx.focusListSearch")
+    static let focusDetailFind = Notification.Name("logx.focusDetailFind")
 }

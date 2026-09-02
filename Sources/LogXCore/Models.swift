@@ -52,8 +52,13 @@ public enum StatusClass: String, Equatable, Sendable, CaseIterable {
 public struct NetworkLog: Identifiable, Equatable, Sendable {
     public var key: String
     public var method: String
-    public var url: String
-    public var api: String
+    public var url: String { didSet { reparseURL() } }
+    public var api: String { didSet { reparseURL() } }
+    /// URL bir marta ajratiladi (host / yo'l / query) — ro'yxat, filtr va shovqin
+    /// tekshiruvi har chaqiruvda qayta parse qilmaydi.
+    public private(set) var hostLabel: String = ""
+    public private(set) var pathOnly: String = ""
+    public private(set) var queryString: String = ""
     public var responseCode: Int?
     public var responseMessage: String?
     public var durationMs: Int?
@@ -91,7 +96,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         if code >= 500 { return .err5xx }
         if code >= 400 { return .err4xx }
         if code >= 300 && code < 400 { return .redirect3xx }
-        if code >= 200 && code < 300 { return .ok2xx }
+        if code >= 100 && code < 300 { return .ok2xx }
         return .net
     }
 
@@ -109,11 +114,14 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
     public var appShortLabel: String { AppProfile.display(for: self).shortLabel }
 
     public var pathLabel: String {
-        let raw = url.isEmpty ? api : url
-        guard let parsed = URL(string: raw) else { return raw }
-        let path = parsed.path.isEmpty ? raw : parsed.path
-        if let q = parsed.query, !q.isEmpty { return "\(path)?\(q)" }
-        return path
+        queryString.isEmpty ? pathOnly : "\(pathOnly)?\(queryString)"
+    }
+
+    private mutating func reparseURL() {
+        let parts = URLParts.parse(url.isEmpty ? api : url)
+        hostLabel = parts.host
+        pathOnly = parts.path
+        queryString = parts.query
     }
 
     public var statusDescription: String {
@@ -156,14 +164,6 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         guard let ms = durationMs else { return "—" }
         if ms >= 1000 { return String(format: "%.2f s", Double(ms) / 1000) }
         return "\(ms) ms"
-    }
-
-    public var formattedBodySize: String {
-        let bytes = (responseBody?.utf8.count ?? 0)
-        guard bytes > 0 else { return "—" }
-        if bytes >= 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / 1_048_576) }
-        if bytes >= 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
-        return "\(bytes) B"
     }
 
     public init(
@@ -234,6 +234,47 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         self.assistantJshshir = assistantJshshir
         self.responseBodyMessage = responseBodyMessage
         self.photoCount = photoCount
+        reparseURL()
+    }
+}
+
+/// Bayt hajmi yorlig'i — ro'yxat, sarlavha va eksport bir xil yozadi.
+public enum ByteSize {
+    public static func label(_ bytes: Int) -> String {
+        if bytes >= 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / 1_048_576) }
+        if bytes >= 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
+        return "\(bytes) B"
+    }
+}
+
+/// URL'ni host / yo'l / query ga ajratadi; `URL(string:)` yiqilsa (bo'sh joy,
+/// noto'g'ri belgilar) qo'lda bo'linadi — hech qachon butun URL yo'l bo'lib qolmaydi.
+public enum URLParts {
+    public static func parse(_ raw: String) -> (host: String, path: String, query: String) {
+        guard !raw.isEmpty else { return ("", "", "") }
+        if let parsed = URL(string: raw), let host = parsed.host {
+            let path = parsed.path.isEmpty ? "/" : parsed.path
+            return (host, path, parsed.query ?? "")
+        }
+        var rest = Substring(raw)
+        if let hash = rest.firstIndex(of: "#") { rest = rest[..<hash] }
+        var query = ""
+        if let q = rest.firstIndex(of: "?") {
+            query = String(rest[rest.index(after: q)...])
+            rest = rest[..<q]
+        }
+        var host = ""
+        if let scheme = rest.range(of: "://") {
+            let afterScheme = rest[scheme.upperBound...]
+            if let slash = afterScheme.firstIndex(of: "/") {
+                host = String(afterScheme[..<slash])
+                rest = afterScheme[slash...]
+            } else {
+                host = String(afterScheme)
+                rest = "/"
+            }
+        }
+        return (host, String(rest), query)
     }
 }
 
@@ -257,35 +298,9 @@ public struct AppsPayload: Decodable {
     public var apps: [AppProfile]
 }
 
-public struct LogsPayload: Decodable {
-    public var ok: Bool?
-    public var error: String?
-    public var items: [LogEnvelope]
-
-    public init(ok: Bool? = true, error: String? = nil, items: [LogEnvelope] = []) {
-        self.ok = ok
-        self.error = error
-        self.items = items
-    }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        ok = try c.decodeIfPresent(Bool.self, forKey: .ok)
-        error = try c.decodeIfPresent(String.self, forKey: .error)
-        items = try c.decodeIfPresent([LogEnvelope].self, forKey: .items) ?? []
-    }
-
-    enum CodingKeys: String, CodingKey { case ok, error, items }
-}
-
 public struct LogEnvelope: Decodable {
     public var key: String
     public var value: LogValue
-}
-
-public struct LogDetailPayload: Decodable {
-    public var ok: Bool?
-    public var item: LogEnvelope?
 }
 
 public struct LogValue: Decodable {

@@ -85,7 +85,7 @@ final class LiveStreamTests: XCTestCase {
         )
         XCTAssertEqual(
             AppConnectionResolver.resolve(
-                isLoading: false, serverOK: true, isPaused: false, deviceCount: 1, streams: [.idle]
+                isLoading: false, serverOK: true, isPaused: false, deviceCount: 1, streams: [.connecting]
             ),
             .connecting
         )
@@ -255,7 +255,7 @@ final class LiveStreamTests: XCTestCase {
         XCTAssertFalse(src.contains("/api/demo-network-logs"), src)
         XCTAssertFalse(src.contains("URLSession.shared"), src)
         XCTAssertTrue(src.contains("MonitorSessions.rest"), src)
-        XCTAssertTrue(src.contains("return []"), src)
+        XCTAssertFalse(src.contains("func logs("), src)
     }
 
     func testStoreSourceReconnectsAndSkipsSharedSession() throws {

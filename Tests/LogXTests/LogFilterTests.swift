@@ -55,49 +55,38 @@ final class LogFilterTests: XCTestCase {
         XCTAssertFalse(LogFilter.matchesApp(log, appId: "mahalla"))
     }
 
-    func testDeviceFilter_modelAndSerial() {
+    func testDeviceFilter_serialScope() {
         let a = NetworkLog(key: "a", serial: "10AC8Z1QNJ000T6", device: "vivo V2202")
-        let b = NetworkLog(key: "b", device: "samsung SM-X216B")
-        XCTAssertTrue(LogFilter.matchesDevice(a, device: vivo))
-        XCTAssertFalse(LogFilter.matchesDevice(a, device: tab))
-        XCTAssertFalse(LogFilter.matchesDevice(b, device: tab))
-        XCTAssertTrue(LogFilter.matchesDevice(b, scope: .field(FieldDevice(id: "samsung sm-x216b", label: "samsung SM-X216B", count: 1))))
-        XCTAssertTrue(LogFilter.matchesDevice(a, device: nil))
+        let b = NetworkLog(key: "b", serial: "R52T", device: "samsung SM-X216B")
+        XCTAssertTrue(LogFilter.matchesDevice(a, scope: .usb(vivo)))
+        XCTAssertFalse(LogFilter.matchesDevice(a, scope: .usb(tab)))
+        XCTAssertTrue(LogFilter.matchesDevice(b, scope: .usb(tab)))
+        XCTAssertTrue(LogFilter.matchesDevice(a, scope: .all))
     }
 
-    func testDeviceFilter_emptyDeviceFieldKeepsRow() {
+    func testDeviceFilter_emptySerialHiddenOnUsbScope() {
         let log = NetworkLog(key: "z")
-        XCTAssertFalse(LogFilter.matchesDevice(log, device: vivo))
+        XCTAssertFalse(LogFilter.matchesDevice(log, scope: .usb(vivo)))
         XCTAssertTrue(LogFilter.matchesDevice(log, scope: .all))
     }
 
-    func testResolvedScopeDropsStaleFieldAndPrefersLiveUsb() {
+    func testResolvedScopeDropsStaleUsb() {
         let usb = ConnectedDevice(serial: "127.0.0.1:6562", model: "Phone", product: "emu")
-        let xiaomi = FieldDevice(id: "dev-xiaomi-1", label: "Xiaomi 2209116AG", count: 8)
-        let live = DeviceScope.resolved(
-            usbSerial: usb.serial, fieldId: xiaomi.id, devices: [usb], fields: [xiaomi]
-        )
+        let live = DeviceScope.resolved(usbSerial: usb.serial, devices: [usb])
         XCTAssertEqual(live.scope, .usb(usb))
         XCTAssertEqual(live.usbSerial, usb.serial)
-        XCTAssertNil(live.fieldId)
         XCTAssertEqual(live.scope.title, usb.title)
 
-        let field = DeviceScope.resolved(
-            usbSerial: nil, fieldId: xiaomi.id, devices: [usb], fields: [xiaomi]
-        )
-        XCTAssertEqual(field.scope, .field(xiaomi))
-        XCTAssertEqual(field.scope.title, "Xiaomi 2209116AG")
-
-        let stale = DeviceScope.resolved(
-            usbSerial: "gone", fieldId: "missing", devices: [usb], fields: [xiaomi]
-        )
+        let stale = DeviceScope.resolved(usbSerial: "gone", devices: [usb])
         XCTAssertEqual(stale.scope, .all)
         XCTAssertNil(stale.usbSerial)
-        XCTAssertNil(stale.fieldId)
         XCTAssertEqual(stale.scope.title, "Barcha qurilmalar")
+
+        let none = DeviceScope.resolved(usbSerial: nil, devices: [usb])
+        XCTAssertEqual(none.scope, .all)
     }
 
-    func testUsbScopeHidesFieldRtdbLog() {
+    func testUsbScopeHidesRtdbLog() {
         let usb = ConnectedDevice(serial: "127.0.0.1:6562", model: "Phone", product: "emu")
         let log = NetworkLog(
             key: "xiaomi",
@@ -109,12 +98,8 @@ final class LogFilterTests: XCTestCase {
         )
         XCTAssertFalse(LogFilter.matchesDevice(log, scope: .usb(usb)))
         XCTAssertTrue(LogFilter.matchesDevice(log, scope: .all))
-        let field = FieldDevice(id: "dev-xiaomi-1", label: "Xiaomi 2209116AG", count: 8)
-        XCTAssertTrue(LogFilter.matchesDevice(log, scope: .field(field)))
-        XCTAssertFalse(LogFilter.matchesDevice(log, scope: .field(FieldDevice(id: "o", label: "SOTEN T101_2021", count: 1))))
         XCTAssertTrue(LogFilter.apply([log], appId: "all", scope: .usb(usb), status: .all, query: "").isEmpty)
         XCTAssertTrue(LogFilter.apply([log], appId: "all", scope: .all, status: .all, query: "").isEmpty)
-        XCTAssertEqual(FieldDevices.collect([log, log]).first?.count, 2)
     }
 
     func testStatusAndQuery() {
@@ -133,7 +118,7 @@ final class LogFilterTests: XCTestCase {
     func testApplySortsNewestFirst() {
         let older = NetworkLog(key: "old", responseCode: 200, serial: "A", ts: 1)
         let newer = NetworkLog(key: "new", responseCode: 200, serial: "A", ts: 9)
-        let out = LogFilter.apply([older, newer], appId: "all", device: nil, status: .all, query: "")
+        let out = LogFilter.apply([older, newer], appId: "all", scope: .all, status: .all, query: "")
         XCTAssertEqual(out.map { $0.key }, ["new", "old"])
     }
 
@@ -172,7 +157,7 @@ final class LogFilterTests: XCTestCase {
         let merged = AppProfile.merge(api: [], logs: [live])
         XCTAssertTrue(merged.contains(where: { $0.id == "mahalla" }))
         XCTAssertTrue(merged.contains(where: { $0.id == "avto_park" }))
-        XCTAssertEqual(merged.first(where: { $0.id == "uz.realsoft.new.app" })?.shortLabel, "App")
+        XCTAssertEqual(merged.first(where: { $0.id == "uz.realsoft.new.app" })?.shortLabel, "New", "generic trailing segment is skipped")
         XCTAssertFalse(merged.contains(where: { $0.id == live.resolvedAppId && $0.id == "mahalla" }))
     }
 
