@@ -114,8 +114,8 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         mainMenu.addItem(fileMenuItem)
         let fileMenu = NSMenu(title: "Fayl")
         fileMenuItem.submenu = fileMenu
-        add(fileMenu, "HAR saqlash…", #selector(exportHAR(_:)), "s", .command, target: self)
-        add(fileMenu, "JSON saqlash…", #selector(exportJSON(_:)), "s", [.command, .shift], target: self)
+        add(fileMenu, "Ko'rinadiganlarni HAR saqlash…", #selector(exportHAR(_:)), "s", .command, target: self)
+        add(fileMenu, "Ko'rinadiganlarni JSON saqlash…", #selector(exportJSON(_:)), "s", [.command, .shift], target: self)
         fileMenu.addItem(NSMenuItem.separator())
         add(fileMenu, "Yopish", #selector(NSWindow.performClose(_:)), "w", .command)
 
@@ -160,6 +160,9 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         sessionMenu.addItem(NSMenuItem.separator())
         add(sessionMenu, "Qayta ulash", #selector(reconnect(_:)), "r", .command, target: self)
         sessionMenu.addItem(NSMenuItem.separator())
+        add(sessionMenu, "Keyingi xato", #selector(nextError(_:)), "e", .command, target: self)
+        add(sessionMenu, "Oldingi xato", #selector(previousError(_:)), "e", [.command, .shift], target: self)
+        sessionMenu.addItem(NSMenuItem.separator())
         add(sessionMenu, "Kuzat", #selector(toggleFollow(_:)), "l", .command, target: self)
         add(sessionMenu, "Shovqinni yashirish", #selector(toggleHideNoise(_:)), "n", [.command, .option], target: self)
 
@@ -203,6 +206,8 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
     @objc func copyBody(_ sender: Any?) { store?.copySelectedBody() }
     @objc func toggleRedact(_ sender: Any?) { store?.redactEnabled.toggle() }
     @objc func toggleFollow(_ sender: Any?) { store?.toggleFollowLatest() }
+    @objc func nextError(_ sender: Any?) { store?.moveToError(forward: true) }
+    @objc func previousError(_ sender: Any?) { store?.moveToError(forward: false) }
     @objc func toggleHideNoise(_ sender: Any?) { store?.toggleHideNoise() }
     @objc func exportHAR(_ sender: Any?) { store?.exportHAR() }
     @objc func exportJSON(_ sender: Any?) { store?.exportJSON() }
@@ -223,7 +228,7 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
 
     @objc func copyCurl(_ sender: Any?) {
         guard let store, let log = store.selectedLog else { return }
-        CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
+        store.copy(CurlBuilder.command(for: log, redact: store.redactEnabled), what: "cURL")
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -235,6 +240,8 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
             return store.selectedLog != nil
         case #selector(exportHAR(_:)), #selector(exportJSON(_:)):
             return store.canExport
+        case #selector(nextError(_:)), #selector(previousError(_:)):
+            return store.errorCount > 0
         case #selector(clearLogs(_:)):
             return !store.allLogs.isEmpty
         case #selector(undoClear(_:)):

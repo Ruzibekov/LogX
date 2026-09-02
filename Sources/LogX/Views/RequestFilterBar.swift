@@ -67,6 +67,11 @@ struct RequestFilterBar: View {
             .onReceive(NotificationCenter.default.publisher(for: LogXNotice.focusListSearch)) { _ in
                 searchFocused = true
             }
+            .onKeyPress(.downArrow) {
+                searchFocused = false
+                NotificationCenter.default.post(name: LogXNotice.focusList, object: nil)
+                return .handled
+            }
             if !store.query.isEmpty {
                 Button {
                     store.applyQuery("")

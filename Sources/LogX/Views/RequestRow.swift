@@ -31,6 +31,7 @@ struct RequestRow: View {
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(LogXTheme.status(log.statusClass))
                 .frame(width: 44, alignment: .leading)
+                .help(log.statusDescription)
 
             VStack(alignment: .leading, spacing: 1) {
                 if !log.hostLabel.isEmpty {
@@ -46,16 +47,23 @@ struct RequestRow: View {
                         .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                        .help(store.shareableURL(log))
 
                     let repeats = store.repeatCount(for: log)
                     if repeats > 1 {
-                        Text("×\(repeats)")
-                            .font(.system(size: 9, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(LogXTheme.accentLight)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1.5)
-                            .background(LogXTheme.chipOn, in: RoundedRectangle(cornerRadius: 3.5))
-                            .help("Shu endpoint takrorlari")
+                        Button {
+                            store.filterEndpoint(log)
+                        } label: {
+                            Text("×\(repeats)")
+                                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                .foregroundStyle(LogXTheme.accentLight)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1.5)
+                                .background(LogXTheme.chipOn, in: RoundedRectangle(cornerRadius: 3.5))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Shu endpoint \(repeats) marta — bosilsa faqat shular qoladi")
+                        .accessibilityLabel("Shu endpointni filtrlash")
                     }
 
                     if RelativeTime.isFresh(ts: log.ts, now: now) {
@@ -71,7 +79,7 @@ struct RequestRow: View {
 
                     if hovered || copied {
                         Button {
-                            CopyBox.plainText(store.shareableURL(log))
+                            store.copy(store.shareableURL(log), what: "URL")
                             copied = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
                         } label: {

@@ -30,6 +30,14 @@ public struct ConnectedDevice: Identifiable, Equatable, Sendable, Codable {
 }
 
 public enum StatusClass: String, Equatable, Sendable, CaseIterable {
+    /// 4xx, 5xx va tarmoq xatosi — «keyingi xato» sakrashi shular ustida yuradi.
+    public var isFailure: Bool {
+        switch self {
+        case .err4xx, .err5xx, .net: return true
+        default: return false
+        }
+    }
+
     case all
     case ok2xx
     case redirect3xx

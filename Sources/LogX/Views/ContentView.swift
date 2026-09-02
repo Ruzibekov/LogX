@@ -134,9 +134,6 @@ struct ContentView: View {
                 .keyboardShortcut("k", modifiers: .command)
             }
         }
-        .onExitCommand {
-            store.clearSelection()
-        }
     }
 
     private var visibility: Binding<NavigationSplitViewVisibility> {
@@ -161,4 +158,5 @@ struct ContentView: View {
 enum LogXNotice {
     static let focusListSearch = Notification.Name("logx.focusListSearch")
     static let focusDetailFind = Notification.Name("logx.focusDetailFind")
+    static let focusList = Notification.Name("logx.focusList")
 }

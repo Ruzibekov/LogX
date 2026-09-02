@@ -12,6 +12,10 @@ struct RequestList: View {
         VStack(spacing: 0) {
             RequestFilterBar()
             Divider().overlay(LogXTheme.divider)
+            if let banner = store.banner, !store.visibleLogs.isEmpty {
+                noticeStrip(banner)
+                Divider().overlay(LogXTheme.divider)
+            }
             if store.isLoading {
                 VStack(spacing: 10) {
                     ProgressView().scaleEffect(0.9)
@@ -26,7 +30,51 @@ struct RequestList: View {
             RequestLiveBar(now: now)
         }
         .background(LogXTheme.bg)
+        .overlay(alignment: .bottom) {
+            if let toast = store.toast {
+                ToastView(toast: toast) { store.dismissToast() }
+                    .padding(.bottom, 40)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.toast)
         .onReceive(ticker) { now = $0 }
+    }
+
+    /// Oqim/monitor xabari ro'yxat to'la bo'lganda ham ko'rinadi; buyruq bo'lsa bir bosishda nusxalanadi.
+    private func noticeStrip(_ text: String) -> some View {
+        let command = text.split(separator: "—").map { $0.trimmingCharacters(in: .whitespaces) }.first(where: { $0.hasPrefix("bash ") })
+        return HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10.5, weight: .semibold))
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(2)
+                .textSelection(.enabled)
+            Spacer(minLength: 4)
+            if let command {
+                Button("Buyruqni nusxalash") { store.copy(command, what: "buyruq") }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(LogXTheme.accentLight)
+            }
+            Button {
+                store.dismissBanner()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(LogXTheme.muted)
+                    .padding(4)
+            }
+            .buttonStyle(.plain)
+            .help("Xabarni yopish")
+            .accessibilityLabel("Xabarni yopish")
+        }
+        .foregroundStyle(LogXTheme.warn)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LogXTheme.warn.opacity(0.1))
     }
 
     private var listScope: String {
@@ -78,6 +126,11 @@ struct RequestList: View {
                     default: break
                     }
                 }
+                .onExitCommand { store.clearSelection() }
+                .onReceive(NotificationCenter.default.publisher(for: LogXNotice.focusList)) { _ in
+                    listFocused = true
+                    if store.selectedKey == nil { store.moveSelection(by: 1) }
+                }
                 .onKeyPress(.upArrow) { store.moveSelection(by: -1); return .handled }
                 .onKeyPress(.downArrow) { store.moveSelection(by: 1); return .handled }
                 .onChange(of: store.selectedKey) { _, key in
@@ -92,28 +145,33 @@ struct RequestList: View {
 
     @ViewBuilder
     private func rowMenu(_ log: NetworkLog) -> some View {
-        Button("URL'ni nusxalash") { CopyBox.plainText(store.shareableURL(log)) }
-        Button("Qatorni nusxalash") {
-            CopyBox.plainText("\(log.method) \(log.hostLabel) \(store.displayPath(log)) \(log.appShortLabel) \(RelativeTime.clock(ts: log.ts))")
+        Button(store.query == log.pathOnly ? "Endpoint filtrini olib tashlash" : "Shu endpointni filtrlash") { store.filterEndpoint(log) }
+        if !log.hostLabel.isEmpty {
+            Button(store.selectedHost == log.hostLabel ? "Host filtrini olib tashlash" : "Faqat shu host") { store.selectHost(log.hostLabel) }
         }
-        Button("Yo'lni nusxalash") { CopyBox.plainText(store.displayPath(log)) }
+        Divider()
+        Button("URL'ni nusxalash") { store.copy(store.shareableURL(log), what: "URL") }
+        Button("Qatorni nusxalash") {
+            store.copy("\(log.method) \(log.hostLabel) \(store.displayPath(log)) \(log.appShortLabel) \(RelativeTime.clock(ts: log.ts))", what: "qator")
+        }
+        Button("Yo'lni nusxalash") { store.copy(store.displayPath(log), what: "yo'l") }
         Button("cURL sifatida nusxalash") {
-            CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
+            store.copy(CurlBuilder.command(for: log, redact: store.redactEnabled), what: "cURL")
         }
         Button("So'rov bodyni nusxalash") {
-            CopyBox.plainText(store.redactEnabled ? (Redactor.redactBody(log.requestBody) ?? "") : (log.requestBody ?? ""))
+            store.copy(store.redactEnabled ? (Redactor.redactBody(log.requestBody) ?? "") : (log.requestBody ?? ""), what: "so'rov tanasi")
         }
         Button("Javobni nusxalash") {
-            CopyBox.plainText(store.redactEnabled ? (Redactor.redactBody(log.responseBody) ?? "") : (log.responseBody ?? ""))
+            store.copy(store.redactEnabled ? (Redactor.redactBody(log.responseBody) ?? "") : (log.responseBody ?? ""), what: "javob")
         }
         Button("Sarlavhalarni nusxalash") {
             let req = store.redactEnabled ? Redactor.mask(log.requestHeaders) : log.requestHeaders
             let res = store.redactEnabled ? Redactor.mask(log.responseHeaders) : log.responseHeaders
-            CopyBox.plainText(JSONFormat.headersText(request: req, response: res))
+            store.copy(JSONFormat.headersText(request: req, response: res), what: "sarlavhalar")
         }
         Button("HAR nusxalash") {
             let data = SessionExport.har(logs: [log], redact: store.redactEnabled)
-            CopyBox.plainText(String(data: data, encoding: .utf8) ?? "")
+            store.copy(String(data: data, encoding: .utf8) ?? "", what: "HAR")
         }
         Divider()
         Button(store.isFavorite(log.key) ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish") {
@@ -126,6 +184,37 @@ enum CopyBox {
     static func plainText(_ raw: String) {
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(raw.isEmpty ? "—" : raw, forType: .string)
+        pb.setString(raw, forType: .string)
+    }
+}
+
+struct ToastView: View {
+    var toast: Toast
+    var dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(toast.text)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(LogXTheme.text)
+                .lineLimit(1)
+            if let title = toast.actionTitle, let action = toast.action {
+                Button(title) {
+                    action()
+                    dismiss()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(LogXTheme.accentLight)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(LogXTheme.panel2, in: Capsule())
+        .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+        .onTapGesture(perform: dismiss)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }

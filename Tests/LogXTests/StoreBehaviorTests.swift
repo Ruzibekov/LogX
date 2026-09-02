@@ -216,3 +216,163 @@ final class ThemeAndSelectionTests: XCTestCase {
         XCTAssertEqual(store.selectedKey, store.visibleLogs[2].key, "↑ without selection starts from the bottom")
     }
 }
+
+@MainActor
+final class ConvenienceTests: XCTestCase {
+    private func source(_ rel: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(rel), encoding: .utf8)
+    }
+
+    private func makeStore() -> LogStore {
+        let store = LogStore()
+        store.hideNoise = true
+        store.followLatest = false
+        store.slowOnly = false
+        store.errorsOnly = false
+        store.favoritesOnly = false
+        store.favoriteKeys = []
+        store.status = .all
+        store.selectedMethod = "ALL"
+        store.selectedAppId = "all"
+        store.selectedSerial = nil
+        store.selectedHost = nil
+        store.query = ""
+        store.isPaused = false
+        return store
+    }
+
+    private func log(_ key: String, code: Int? = 200, path: String = "/v1/items", ts: Double) -> NetworkLog {
+        NetworkLog(key: key, method: "GET", url: "https://api.example.uz\(path)", responseCode: code, packageName: "uz.test.app", source: "logcat", serial: "A", ts: ts)
+    }
+
+    func testNextAndPreviousErrorWalkFailuresAndWrap() {
+        let store = makeStore()
+        store.ingestBatch([log("a", ts: 1), log("b", code: 500, ts: 2), log("c", ts: 3), log("d", code: nil, ts: 4), log("e", ts: 5)])
+        let keys = store.visibleLogs.map(\.key)
+        XCTAssertEqual(keys, ["e", "d", "c", "b", "a"])
+        XCTAssertTrue(store.moveToError(forward: true))
+        XCTAssertEqual(store.selectedKey, "d")
+        XCTAssertTrue(store.moveToError(forward: true))
+        XCTAssertEqual(store.selectedKey, "b")
+        XCTAssertTrue(store.moveToError(forward: true), "wraps to the first failure")
+        XCTAssertEqual(store.selectedKey, "d")
+        XCTAssertTrue(store.moveToError(forward: false))
+        XCTAssertEqual(store.selectedKey, "b")
+        XCTAssertTrue(store.moveToError(forward: false))
+        XCTAssertEqual(store.selectedKey, "d")
+        store.selectLog(store.visibleLogs[0])
+        XCTAssertTrue(store.moveToError(forward: false), "backward from the first row must wrap, not trap")
+        XCTAssertEqual(store.selectedKey, "b")
+        store.clearSelection()
+        XCTAssertTrue(store.moveToError(forward: false), "backward with no selection starts from the bottom")
+        XCTAssertEqual(store.selectedKey, "b")
+        store.selectLog(store.visibleLogs[4])
+        XCTAssertTrue(store.moveToError(forward: true), "forward from the last row wraps")
+        XCTAssertEqual(store.selectedKey, "d")
+    }
+
+    func testNextErrorWithoutFailuresLeavesSelectionAndSaysSo() {
+        let store = makeStore()
+        store.ingestBatch([log("a", ts: 1), log("b", ts: 2)])
+        store.selectLog(log("a", ts: 1))
+        XCTAssertFalse(store.moveToError(forward: true))
+        XCTAssertEqual(store.selectedKey, "a")
+        XCTAssertEqual(store.toast?.text, "Keyingi xato yo'q")
+    }
+
+    func testCopyOfEmptyTextIsRefusedWithFeedback() {
+        let store = makeStore()
+        store.copy("   \n", what: "javob")
+        XCTAssertEqual(store.toast?.text, "javob bo'sh — nusxalanmadi")
+        store.copy("—", what: "URL")
+        XCTAssertEqual(store.toast?.text, "URL bo'sh — nusxalanmadi")
+    }
+
+    func testClearOffersUndoInToastAndUndoRestores() {
+        let store = makeStore()
+        store.ingestBatch([log("a", ts: 1), log("b", ts: 2)])
+        store.clearLogs()
+        XCTAssertEqual(store.allLogs.count, 0)
+        XCTAssertEqual(store.toast?.text, "2 ta so'rov tozalandi")
+        XCTAssertEqual(store.toast?.actionTitle, "Bekor qilish")
+        store.toast?.action?()
+        XCTAssertEqual(store.allLogs.count, 2)
+    }
+
+    func testEndpointFilterTogglesQueryToPathOnly() {
+        let store = makeStore()
+        let item = log("a", path: "/v1/items?page=2", ts: 1)
+        store.ingestBatch([item, log("b", path: "/v1/other", ts: 2)])
+        store.filterEndpoint(item)
+        XCTAssertEqual(store.query, "/v1/items")
+        store.filterEndpoint(item)
+        XCTAssertEqual(store.query, "")
+    }
+
+    func testSelectingRowWhileFollowingExplainsWhyFollowStopped() {
+        let store = makeStore()
+        store.followLatest = true
+        store.ingestBatch([log("a", ts: 1)])
+        store.selectLog(log("a", ts: 1))
+        XCTAssertFalse(store.followLatest)
+        XCTAssertEqual(store.toast?.text, "Kuzat o'chdi — ⌘L qaytaradi")
+    }
+
+    func testTransientFiltersAreNotRestoredOnLaunch() throws {
+        let store = try source("Sources/LogX/Store.swift")
+        XCTAssertFalse(store.contains("status = StatusClass(rawValue: prefs.status)"), "status filter must start fresh")
+        XCTAssertFalse(store.contains("errorsOnly = prefs.errorsOnly"), store)
+        XCTAssertFalse(store.contains("selectedMethod = prefs.selectedMethod"), store)
+        XCTAssertFalse(store.contains("slowOnly = prefs.slowOnly"), store)
+        let detail = try source("Sources/LogX/Views/RequestDetail.swift")
+        XCTAssertFalse(detail.contains("CopyBox.plainText("), "every copy in the detail goes through store.copy")
+        XCTAssertTrue(store.contains("hideNoise = prefs.hideNoise"), store)
+        XCTAssertTrue(store.contains("selectedSerial = prefs.selectedSerial"), store)
+    }
+
+    func testFindQuerySurvivesSelectionChange() throws {
+        let detail = try source("Sources/LogX/Views/RequestDetail.swift")
+        let onChange = detail.range(of: ".onChange(of: store.selectedKey)")!
+        let block = detail[onChange.lowerBound..<detail.index(onChange.upperBound, offsetBy: 80)]
+        XCTAssertFalse(block.contains("findQuery = \"\""), String(block))
+        XCTAssertTrue(block.contains("findIndex = 0"), String(block))
+    }
+
+    func testAffordancesAreVisible() throws {
+        let app = try source("Sources/LogX/LogXApp.swift")
+        XCTAssertTrue(app.contains("\"Keyingi xato\", #selector(nextError(_:)), \"e\", .command"), app)
+        XCTAssertTrue(app.contains("Ko'rinadiganlarni HAR saqlash"), app)
+        let content = try source("Sources/LogX/Views/ContentView.swift")
+        XCTAssertFalse(content.contains("onExitCommand"), "Esc must not clear selection from anywhere in the window")
+        let list = try source("Sources/LogX/Views/RequestList.swift")
+        XCTAssertTrue(list.contains("noticeStrip(banner)"), list)
+        XCTAssertTrue(list.contains("ToastView(toast: toast)"), list)
+        XCTAssertTrue(list.contains("Shu endpointni filtrlash"), list)
+        XCTAssertTrue(list.contains("Faqat shu host"), list)
+        XCTAssertFalse(list.contains("raw.isEmpty ? \"—\""), "empty copy must not write a dash")
+        XCTAssertFalse(list.contains("CopyBox.plainText(store"), "list copies go through store.copy for feedback")
+        let row = try source("Sources/LogX/Views/RequestRow.swift")
+        XCTAssertTrue(row.contains(".help(store.shareableURL(log))"), row)
+        XCTAssertTrue(row.contains(".help(log.statusDescription)"), row)
+        XCTAssertTrue(row.contains("store.filterEndpoint(log)"), row)
+        let header = try source("Sources/LogX/Views/DetailHeader.swift")
+        XCTAssertTrue(header.contains("RelativeTime.stamp(ts: log.ts)"), header)
+        XCTAssertTrue(header.contains(".disabled(masked)"), header)
+        let detail = try source("Sources/LogX/Views/RequestDetail.swift")
+        XCTAssertTrue(detail.contains("Tokenlarni yashir"), detail)
+        let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
+        XCTAssertTrue(filters.contains("LogXNotice.focusList"), "↓ from search must hand focus to the list")
+        let empty = try source("Sources/LogX/Views/RequestEmptyView.swift")
+        XCTAssertTrue(empty.contains("adb devices"), empty)
+    }
+
+    func testStampShowsDateAndMilliseconds() {
+        let ts = 1_756_800_000_123.0
+        XCTAssertEqual(RelativeTime.stamp(ts: ts, timeZone: TimeZone(identifier: "UTC")!), "02.09 08:00:00.123")
+        XCTAssertEqual(RelativeTime.stamp(ts: nil), "—")
+        XCTAssertTrue(StatusClass.err5xx.isFailure)
+        XCTAssertTrue(StatusClass.net.isFailure)
+        XCTAssertFalse(StatusClass.ok2xx.isFailure)
+    }
+}

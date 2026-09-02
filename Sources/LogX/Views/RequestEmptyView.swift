@@ -21,8 +21,27 @@ struct RequestEmptyView: View {
                     icon: "cable.connector.slash",
                     tint: LogXTheme.warn,
                     title: "USB yo'q",
-                    subtitle: "Telefonni kabel bilan ulang."
-                )
+                    subtitle: "Kabelni ulang · telefonda USB debugging yoqiq · «Allow USB debugging» bosilgan bo'lsin."
+                ) {
+                    Button {
+                        store.copy("adb devices", what: "buyruq")
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "terminal")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("adb devices nusxalash")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(LogXTheme.text2)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(LogXTheme.panel2))
+                        .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Terminalda tekshiring: qurilma «unauthorized» bo'lsa telefonda ruxsat bering")
+                    .padding(.top, 4)
+                }
             case .booting, .connecting:
                 emptyChrome(
                     icon: "dot.radiowaves.left.and.right",

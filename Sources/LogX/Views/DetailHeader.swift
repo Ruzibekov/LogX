@@ -68,6 +68,16 @@ struct DetailHeader: View {
                     .padding(.vertical, 3)
                     .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 5).stroke(LogXTheme.line, lineWidth: 1))
+                    .help("Shu tab tanasining hajmi")
+
+                Text(RelativeTime.stamp(ts: log.ts))
+                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(LogXTheme.muted)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(LogXTheme.line, lineWidth: 1))
+                    .help("So'rov vaqti · \(RelativeTime.label(ts: log.ts))")
 
                 Spacer()
 
@@ -87,11 +97,12 @@ struct DetailHeader: View {
                     .foregroundStyle(LogXTheme.text2)
                     .lineLimit(2)
                     .textSelection(.enabled)
+                    .help(store.shareableURL(log))
 
                 Spacer(minLength: 4)
 
                 Button {
-                    CopyBox.plainText(store.shareableURL(log))
+                    store.copy(store.shareableURL(log), what: "URL")
                     urlCopied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { urlCopied = false }
                 } label: {
@@ -194,8 +205,9 @@ struct DetailHeader: View {
     }
 
     private func metaChip(_ k: String, _ v: String) -> some View {
-        Button {
-            CopyBox.plainText(v)
+        let masked = v.contains("••")
+        return Button {
+            store.copy(v, what: k)
         } label: {
             HStack(spacing: 4) {
                 Text(k)
@@ -215,7 +227,8 @@ struct DetailHeader: View {
             )
         }
         .buttonStyle(.plain)
-        .help("Nusxalash")
+        .disabled(masked)
+        .help(masked ? "\(v) — token yashirilgan" : "\(v) — bosilsa nusxalanadi")
         .accessibilityLabel("\(k) nusxalash")
     }
 

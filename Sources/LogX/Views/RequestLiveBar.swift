@@ -17,11 +17,12 @@ struct RequestLiveBar: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
             HStack(spacing: 5) {
-                ShortcutGlyph(parts: [.symbol("chevron.up.chevron.down")])
-                ShortcutGlyph(parts: [.symbol("command"), .letter("F")])
-                ShortcutGlyph(parts: [.symbol("command"), .letter("P")])
-                ShortcutGlyph(parts: [.symbol("command"), .symbol("shift"), .letter("C")])
-                ShortcutGlyph(parts: [.symbol("command"), .letter("K")])
+                ShortcutGlyph(parts: [.symbol("chevron.up.chevron.down")]).help("↑↓ — so'rovlar bo'ylab yurish")
+                ShortcutGlyph(parts: [.symbol("command"), .letter("E")]).help("⌘E — keyingi xato, ⇧⌘E — oldingi")
+                ShortcutGlyph(parts: [.symbol("command"), .letter("F")]).help("⌘F — so'rovlarni qidirish, ↓ ro'yxatga o'tadi")
+                ShortcutGlyph(parts: [.symbol("command"), .letter("P")]).help("⌘P — pauza / davom")
+                ShortcutGlyph(parts: [.symbol("command"), .symbol("shift"), .letter("C")]).help("⌘⇧C — cURL nusxalash")
+                ShortcutGlyph(parts: [.symbol("command"), .letter("K")]).help("⌘K — tozalash, ⌥⌘K — bekor qilish")
             }
         }
         .padding(.horizontal, 14)

@@ -175,6 +175,9 @@ extension LogStore {
             guard result == .OK, let url = panel.url else { return }
             do {
                 try data.write(to: url, options: .atomic)
+                self?.flash("Saqlandi · \(url.lastPathComponent)", actionTitle: "Finder'da ko'rsatish", ttl: 8) {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                }
             } catch {
                 self?.presentError(title: "Fayl saqlanmadi", message: "\(url.lastPathComponent): \(error.localizedDescription)")
             }

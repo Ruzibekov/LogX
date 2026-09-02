@@ -94,7 +94,6 @@ struct RequestDetail: View {
             await render(log: log, key: key)
         }
         .onChange(of: store.selectedKey) { _, _ in
-            findQuery = ""
             findIndex = 0
         }
         .onChange(of: store.detailTab) { _, _ in
@@ -202,6 +201,7 @@ struct RequestDetail: View {
                     .foregroundStyle(tab == item ? LogXTheme.text : LogXTheme.muted)
                 }
                 .buttonStyle(.plain)
+                .help("\(item.title) (⌘\(tabShortcut(item).character))")
                 .keyboardShortcut(tabShortcut(item), modifiers: .command)
             }
             Spacer()
@@ -280,7 +280,7 @@ struct RequestDetail: View {
                 shortcut: [.symbol("command"), .symbol("shift"), .letter("C")],
                 help: "cURL buyrug'ini nusxalash (⌘⇧C)"
             ) {
-                CopyBox.plainText(CurlBuilder.command(for: log, redact: store.redactEnabled))
+                store.copy(CurlBuilder.command(for: log, redact: store.redactEnabled), what: "cURL")
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
 
@@ -294,7 +294,11 @@ struct RequestDetail: View {
                 get: { store.redactEnabled },
                 set: { store.redactEnabled = $0 }
             )) {
-                Text("Tokenlar")
+                HStack(spacing: 4) {
+                    Image(systemName: store.redactEnabled ? "eye.slash" : "eye")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("Tokenlarni yashir")
+                }
                     .font(.system(size: 10.5, weight: .semibold))
                     .lineLimit(1)
                     .foregroundStyle(store.redactEnabled ? LogXTheme.accentLight : LogXTheme.muted)
@@ -321,7 +325,7 @@ struct RequestDetail: View {
     }
 
     private func copy(_ text: String) {
-        CopyBox.plainText(text)
+        store.copy(text, what: tab.title)
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
     }
@@ -500,6 +504,7 @@ private struct ParamRowView: View {
     var isEven: Bool
     @State private var hovered = false
     @State private var copied = false
+    @EnvironmentObject private var store: LogStore
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -514,7 +519,7 @@ private struct ParamRowView: View {
             Spacer()
             if hovered || copied {
                 Button {
-                    CopyBox.plainText(value)
+                    store.copy(value, what: key)
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
                 } label: {

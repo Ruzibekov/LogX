@@ -32,6 +32,24 @@ public enum RelativeTime {
         return clockFormatter.string(from: date)
     }
 
+    /// Detal uchun to'liq vaqt: kun.oy soat:daqiqa:soniya.millisekund.
+    public static func stamp(ts: Double?, timeZone: TimeZone = .current) -> String {
+        guard let ts else { return "—" }
+        let seconds = ts > 10_000_000_000 ? ts / 1000 : ts
+        let date = Date(timeIntervalSince1970: seconds)
+        clockLock.lock()
+        defer { clockLock.unlock() }
+        stampFormatter.timeZone = timeZone
+        return stampFormatter.string(from: date)
+    }
+
+    private static let stampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM HH:mm:ss.SSS"
+        formatter.locale = Locale(identifier: "en_GB")
+        return formatter
+    }()
+
     private static let clockLock = NSLock()
     private static let clockFormatter: DateFormatter = {
         let formatter = DateFormatter()
