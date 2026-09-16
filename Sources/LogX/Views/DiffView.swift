@@ -32,7 +32,7 @@ struct DiffView: View {
             Divider().overlay(LogXTheme.divider)
             footer
         }
-        .frame(minWidth: 820, idealWidth: 980, minHeight: 520, idealHeight: 680)
+        .frame(minWidth: 720, idealWidth: 920, minHeight: 480, idealHeight: 640)
         .background(LogXTheme.panel)
         .task(id: key) {
             let k = key
@@ -56,7 +56,7 @@ struct DiffView: View {
                 store.swapDiff()
             } label: {
                 Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(LogXType.ui(LogXType.meta, .semibold))
                     .foregroundStyle(LogXTheme.muted)
                     .frame(width: 26, height: 26)
                     .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(LogXTheme.well))
@@ -73,7 +73,7 @@ struct DiffView: View {
     private func sideCard(label: String, log: NetworkLog, tint: Color) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(label)
-                .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                .font(LogXType.mono(LogXType.meta, .bold))
                 .foregroundStyle(tint)
                 .frame(width: 18, height: 18)
                 .background(RoundedRectangle(cornerRadius: 4).fill(tint.opacity(0.16)))
@@ -81,10 +81,10 @@ struct DiffView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(log.method.uppercased())
-                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .font(LogXType.mono(LogXType.caption, .bold))
                         .foregroundStyle(LogXTheme.text2)
                     Text(store.displayPath(log))
-                        .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                        .font(LogXType.mono(LogXType.body))
                         .foregroundStyle(LogXTheme.text)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -92,17 +92,17 @@ struct DiffView: View {
                 }
                 HStack(spacing: 8) {
                     Text(log.responseCode.map(String.init) ?? "NET")
-                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .font(LogXType.mono(LogXType.caption, .bold))
                         .foregroundStyle(LogXTheme.status(log.statusClass))
                     Text(log.formattedDuration)
-                        .font(.system(size: 10.5, design: .monospaced))
+                        .font(LogXType.mono(LogXType.caption))
                         .foregroundStyle(LogXTheme.muted)
                     Text(RelativeTime.stamp(ts: log.ts))
-                        .font(.system(size: 10.5, design: .monospaced))
+                        .font(LogXType.mono(LogXType.caption))
                         .foregroundStyle(LogXTheme.muted2)
                     if Replay.isReplay(log) {
                         Text("REPLAY")
-                            .font(.system(size: 9, weight: .heavy))
+                            .font(LogXType.ui(LogXType.caption, .bold))
                             .tracking(0.6)
                             .foregroundStyle(LogXTheme.accentLight)
                     }
@@ -122,26 +122,30 @@ struct DiffView: View {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { section = item }
                 } label: {
                     Text(item.title)
-                        .font(.system(size: 11.5, weight: section == item ? .semibold : .medium))
+                        .font(LogXType.ui(LogXType.body, section == item ? .semibold : .medium))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4.5)
-                        .background(Capsule().fill(section == item ? LogXTheme.chipOn : Color.clear))
-                        .overlay(Capsule().stroke(section == item ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1))
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(section == item ? LogXTheme.chipOn : Color.clear))
+                        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(section == item ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1))
                         .foregroundStyle(section == item ? LogXTheme.text : LogXTheme.muted)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LogXPressStyle())
             }
-            Spacer()
+            Spacer(minLength: 8)
             if let rendered {
                 stats(rendered)
             }
             Toggle(isOn: $onlyChanges) {
                 Text("Faqat farqlar")
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(LogXType.ui(LogXType.caption, .semibold))
                     .foregroundStyle(onlyChanges ? LogXTheme.accentLight : LogXTheme.muted)
+                    .lineLimit(1)
             }
             .toggleStyle(.switch)
             .controlSize(.mini)
+            .fixedSize()
             .help("Bir xil qatorlar yig'iladi, o'zgarish atrofida 3 qator qoladi")
         }
         .padding(.horizontal, 12)
@@ -153,19 +157,19 @@ struct DiffView: View {
         HStack(spacing: 6) {
             if rendered.diff.identical {
                 Text("Farq yo'q")
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(LogXType.ui(LogXType.caption, .semibold))
                     .foregroundStyle(LogXTheme.ok)
             } else {
                 Text("+\(rendered.diff.inserted)")
-                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                    .font(LogXType.mono(LogXType.caption, .bold))
                     .foregroundStyle(LogXTheme.ok)
                 Text("−\(rendered.diff.deleted)")
-                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                    .font(LogXType.mono(LogXType.caption, .bold))
                     .foregroundStyle(LogXTheme.err)
             }
             if rendered.diff.truncated {
                 Text("· juda katta, blok sifatida")
-                    .font(.system(size: 10.5))
+                    .font(LogXType.ui(LogXType.caption))
                     .foregroundStyle(LogXTheme.warn)
                     .help("Ikki tomon ham juda uzun — qatorma-qator tekislash o'rniga eski blok o'chdi, yangisi qo'shildi deb ko'rsatildi")
             }
@@ -179,13 +183,13 @@ struct DiffView: View {
             if rendered.diff.identical {
                 VStack(spacing: 8) {
                     Image(systemName: "equal.circle")
-                        .font(.system(size: 28))
+                        .font(LogXType.ui(LogXType.display, .semibold))
                         .foregroundStyle(LogXTheme.ok)
                     Text("\(section.title) bir xil")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(LogXType.ui(LogXType.title))
                         .foregroundStyle(LogXTheme.text2)
                     Text("Boshqa bo'limni tanlang yoki tomonlarni almashtiring")
-                        .font(.system(size: 11))
+                        .font(LogXType.ui(LogXType.meta))
                         .foregroundStyle(LogXTheme.muted2)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -210,13 +214,16 @@ struct DiffView: View {
             Button("Diffni nusxalash") {
                 store.copy(rendered?.unified ?? "", what: "diff")
             }
+            .buttonStyle(LogXPressStyle())
             .disabled(rendered == nil || rendered?.diff.identical == true)
             .help("Unified ko'rinishni (+/−) nusxalash")
             Text("Esc yopadi · ⌘D belgilaydi · ⇧⌘D belgilangan bilan solishtiradi")
-                .font(.system(size: 10.5))
+                .font(LogXType.ui(LogXType.caption))
                 .foregroundStyle(LogXTheme.muted2)
-            Spacer()
+                .lineLimit(1)
+            Spacer(minLength: 8)
             Button("Yopish") { store.closeDiff() }
+                .buttonStyle(LogXPressStyle())
                 .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 12)
@@ -236,8 +243,9 @@ struct RenderedDiff {
         return RenderedDiff(diff: diff, lines: lines, attributed: attributed(lines), unified: TextDiff.unified(lines))
     }
 
-    static let insertBg = NSColor(srgbRed: 0.239, green: 0.745, blue: 0.478, alpha: 0.16)
-    static let deleteBg = NSColor(srgbRed: 0.933, green: 0.416, blue: 0.439, alpha: 0.16)
+    static let insertBg = LogXTheme.dynamicNS(dark: 0x2FBF71, light: 0x1A7A44).withAlphaComponent(0.16)
+    static let deleteBg = LogXTheme.dynamicNS(dark: 0xE5534B, light: 0xC0392F).withAlphaComponent(0.16)
+    static let changedFg = LogXTheme.dynamicNS(dark: 0xECEFF3, light: 0x141821)
 
     static func pad(_ n: Int?) -> String {
         let s = n.map(String.init) ?? ""
@@ -259,11 +267,11 @@ struct RenderedDiff {
                 bg = nil
             case .insert:
                 prefix = "+ "
-                color = NSColor(srgbRed: 0.949, green: 0.953, blue: 0.961, alpha: 1)
+                color = changedFg
                 bg = insertBg
             case .delete:
                 prefix = "- "
-                color = NSColor(srgbRed: 0.949, green: 0.953, blue: 0.961, alpha: 1)
+                color = changedFg
                 bg = deleteBg
             case .gap:
                 prefix = ""

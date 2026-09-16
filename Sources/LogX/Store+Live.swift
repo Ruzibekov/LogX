@@ -68,7 +68,7 @@ extension LogStore {
         }
 
         while !Task.isCancelled {
-            guard let url = LiveStreamURL.httpStream(base: client.baseURL, serial: serial) else {
+            guard let url = LiveStreamURL.httpStream(base: client.baseURL, serial: serial, tail: 1000) else {
                 setHealth(serial, .failed("bad url"))
                 return
             }
@@ -158,16 +158,19 @@ extension LogStore {
         }
         var fresh: [NetworkLog] = []
         var updated = false
-        for var item in items {
+        for rawItem in items {
+            var item = BodyBudget.clamp(rawItem)
             if clearedKeys.contains(item.key) { continue }
             if let existing = liveByKey[item.key] {
                 if item.ts == nil || (existing.ts ?? 0) > 0 { item.ts = existing.ts }
                 if existing != item {
+                    bodyBytesEstimate += BodyBudget.bytes(item) - BodyBudget.bytes(existing)
                     liveByKey[item.key] = item
                     queryMatchCache.removeValue(forKey: item.key)
                     updated = true
                 }
             } else {
+                bodyBytesEstimate += BodyBudget.bytes(item)
                 liveByKey[item.key] = item
                 fresh.append(item)
             }

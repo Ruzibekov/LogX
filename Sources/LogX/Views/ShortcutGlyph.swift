@@ -25,9 +25,9 @@ struct ShortcutGlyph: View {
         .foregroundStyle(LogXTheme.muted2)
         .padding(.horizontal, compact ? 4.5 : 5)
         .padding(.vertical, compact ? 2 : 2.5)
-        .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+        .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .stroke(LogXTheme.line, lineWidth: 1)
         )
         .fixedSize()

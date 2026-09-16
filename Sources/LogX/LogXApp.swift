@@ -48,9 +48,9 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         setupMainMenu()
         let store = LogStore()
         self.store = store
+        applyAppearance(AppearancePreference.load())
         let root = ContentView()
             .environmentObject(store)
-            .preferredColorScheme(.dark)
         let hosting = NSHostingController(rootView: root)
         hosting.view.frame = NSRect(x: 0, y: 0, width: 1440, height: 900)
         let window = NSWindow(
@@ -138,7 +138,8 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         let findMenu = NSMenu(title: "Topish")
         findItem.submenu = findMenu
         editMenu.addItem(findItem)
-        add(findMenu, "So'rovlarni qidirish", #selector(focusListSearch(_:)), "f", .command, target: self)
+        add(findMenu, "JSON ichida topish", #selector(focusDetailFind(_:)), "f", .command, target: self)
+        add(findMenu, "So'rovlarni qidirish", #selector(focusListSearch(_:)), "f", [.command, .shift], target: self)
         add(findMenu, "Tana ichida topish", #selector(focusDetailFind(_:)), "f", [.command, .option], target: self)
 
         let viewMenuItem = NSMenuItem()
@@ -147,6 +148,21 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         viewMenuItem.submenu = viewMenu
         add(viewMenu, "Yon panel", #selector(NSSplitViewController.toggleSidebar(_:)), "s", [.command, .control])
         add(viewMenu, "Tokenlarni yashirish", #selector(toggleRedact(_:)), "t", [.command, .shift], target: self)
+        viewMenu.addItem(NSMenuItem.separator())
+        let themeItem = NSMenuItem(title: "Mavzu", action: nil, keyEquivalent: "")
+        let themeMenu = NSMenu(title: "Mavzu")
+        themeItem.submenu = themeMenu
+        viewMenu.addItem(themeItem)
+        for option in AppearancePreference.allCases {
+            let item = NSMenuItem(title: option.title, action: #selector(selectAppearance(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = option.rawValue
+            themeMenu.addItem(item)
+        }
+        viewMenu.addItem(NSMenuItem.separator())
+        add(viewMenu, "Kattalashtirish", #selector(zoomIn(_:)), "=", .command, target: self)
+        add(viewMenu, "Kichiklashtirish", #selector(zoomOut(_:)), "-", .command, target: self)
+        add(viewMenu, "Asl o'lcham", #selector(zoomReset(_:)), "0", .command, target: self)
         viewMenu.addItem(NSMenuItem.separator())
         add(viewMenu, "To'liq ekran", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control])
 
@@ -221,13 +237,45 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
     @objc func exportHAR(_ sender: Any?) { store?.exportHAR() }
     @objc func exportJSON(_ sender: Any?) { store?.exportJSON() }
 
+    @objc func selectAppearance(_ sender: Any?) {
+        guard let raw = (sender as? NSMenuItem)?.representedObject as? String,
+              let option = AppearancePreference(rawValue: raw) else { return }
+        option.save()
+        applyAppearance(option)
+    }
+
+    private func applyAppearance(_ option: AppearancePreference) {
+        switch option {
+        case .system: NSApp.appearance = nil
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        }
+    }
+
     @objc func focusListSearch(_ sender: Any?) {
         showWindow(nil)
         NotificationCenter.default.post(name: LogXNotice.focusListSearch, object: nil)
     }
 
     @objc func focusDetailFind(_ sender: Any?) {
-        NotificationCenter.default.post(name: LogXNotice.focusDetailFind, object: nil)
+        showWindow(nil)
+        if store?.selectedLog != nil {
+            NotificationCenter.default.post(name: LogXNotice.focusDetailFind, object: nil)
+        } else {
+            focusListSearch(sender)
+        }
+    }
+
+    @objc func zoomIn(_ sender: Any?) {
+        NotificationCenter.default.post(name: LogXNotice.zoomIn, object: nil)
+    }
+
+    @objc func zoomOut(_ sender: Any?) {
+        NotificationCenter.default.post(name: LogXNotice.zoomOut, object: nil)
+    }
+
+    @objc func zoomReset(_ sender: Any?) {
+        NotificationCenter.default.post(name: LogXNotice.zoomReset, object: nil)
     }
 
     @objc func reconnect(_ sender: Any?) {
@@ -245,7 +293,13 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         switch menuItem.action {
         case #selector(togglePause(_:)):
             menuItem.title = store.isPaused ? "Davom ettirish" : "Pauza"
-        case #selector(copyCurl(_:)), #selector(copyBody(_:)), #selector(focusDetailFind(_:)):
+        case #selector(copyCurl(_:)), #selector(copyBody(_:)):
+            return store.selectedLog != nil
+        case #selector(focusDetailFind(_:)):
+            if menuItem.keyEquivalentModifierMask == .command {
+                menuItem.title = store.selectedLog != nil ? "JSON ichida topish" : "So'rovlarni qidirish"
+                return true
+            }
             return store.selectedLog != nil
         case #selector(replaySelected(_:)):
             return store.selectedLog.map { store.canReplay($0) } ?? false
@@ -265,6 +319,9 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
             return !store.allLogs.isEmpty
         case #selector(undoClear(_:)):
             return store.canUndoClear
+        case #selector(selectAppearance(_:)):
+            let raw = menuItem.representedObject as? String
+            menuItem.state = raw == AppearancePreference.load().rawValue ? .on : .off
         case #selector(toggleRedact(_:)):
             menuItem.state = store.redactEnabled ? .on : .off
         case #selector(toggleFollow(_:)):

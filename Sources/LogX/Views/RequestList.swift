@@ -1,12 +1,22 @@
 import AppKit
+import Combine
 import SwiftUI
 import LogXCore
 
 struct RequestList: View {
     @EnvironmentObject private var store: LogStore
     @State private var now = Date()
+    @State private var listWidth: CGFloat = 560
     @FocusState private var listFocused: Bool
     private let ticker = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+
+    private var showAppColumn: Bool {
+        store.selectedAppId == "all" && store.hasMultipleLiveApps && listWidth >= 520
+    }
+
+    private var showTimeColumn: Bool {
+        listWidth >= 430
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +29,7 @@ struct RequestList: View {
             if store.isLoading {
                 VStack(spacing: 10) {
                     ProgressView().scaleEffect(0.9)
-                    Text("Yuklanmoqda…").font(.system(size: 12)).foregroundStyle(LogXTheme.muted)
+                    Text("Yuklanmoqda…").font(LogXType.ui(LogXType.body)).foregroundStyle(LogXTheme.muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if store.visibleLogs.isEmpty {
@@ -30,6 +40,10 @@ struct RequestList: View {
             RequestLiveBar(now: now)
         }
         .background(LogXTheme.bg)
+        .background(GeometryReader { geo in Color.clear.preference(key: RequestListWidthKey.self, value: geo.size.width) })
+        .onPreferenceChange(RequestListWidthKey.self) { width in
+            if width > 0 && abs(listWidth - width) > 4 { listWidth = width }
+        }
         .overlay(alignment: .bottom) {
             if let toast = store.toast {
                 ToastView(toast: toast) { store.dismissToast() }
@@ -41,59 +55,72 @@ struct RequestList: View {
         .onReceive(ticker) { now = $0 }
     }
 
-    /// Oqim/monitor xabari ro'yxat to'la bo'lganda ham ko'rinadi; buyruq bo'lsa bir bosishda nusxalanadi.
     private func noticeStrip(_ text: String) -> some View {
         let command = text.split(separator: "—").map { $0.trimmingCharacters(in: .whitespaces) }.first(where: { $0.hasPrefix("bash ") })
         return HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 10.5, weight: .semibold))
-            Text(text)
-                .font(.system(size: 11, weight: .medium))
-                .lineLimit(2)
-                .textSelection(.enabled)
+            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10.5, weight: .semibold))
+            Text(text).font(.system(size: 11, weight: .medium)).lineLimit(2).textSelection(.enabled)
             Spacer(minLength: 4)
             if let command {
                 Button("Buyruqni nusxalash") { store.copy(command, what: "buyruq") }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(LogXTheme.accentLight)
+                    .buttonStyle(.plain).font(.system(size: 11, weight: .semibold)).foregroundStyle(LogXTheme.accentLight)
             }
-            Button {
-                store.dismissBanner()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(LogXTheme.muted)
-                    .padding(4)
+            Button { store.dismissBanner() } label: {
+                Image(systemName: "xmark").font(.system(size: 9.5, weight: .bold)).foregroundStyle(LogXTheme.muted).padding(4)
             }
-            .buttonStyle(.plain)
-            .help("Xabarni yopish")
-            .accessibilityLabel("Xabarni yopish")
+            .buttonStyle(.plain).help("Xabarni yopish").accessibilityLabel("Xabarni yopish")
         }
-        .foregroundStyle(LogXTheme.warn)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LogXTheme.warn.opacity(0.1))
+        .foregroundStyle(LogXTheme.warn).padding(.horizontal, 12).padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading).background(LogXTheme.warn.opacity(0.1))
     }
 
     private var listScope: String {
         "\(store.selectedAppId)|\(store.selectedSerial ?? "")"
     }
 
-    private var columnHeader: some View {
-        HStack(spacing: 0) {
-            Text("METOD").frame(width: 58, alignment: .leading)
-            Text("KOD").frame(width: 44, alignment: .leading)
-            Text("MANZIL").frame(maxWidth: .infinity, alignment: .leading)
-            Text("DAVOM").frame(width: 58, alignment: .trailing)
-            Text("QACHON").frame(width: 58, alignment: .trailing)
-            Text("ILOVA").frame(width: 76, alignment: .trailing)
-            Color.clear.frame(width: 24, height: 1)
+    private func headerButton(_ title: String, field: LogSortField) -> some View {
+        let active = store.sortField == field
+        return Button {
+            store.toggleSort(field)
+        } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                    .font(LogXType.ui(LogXType.caption, active ? .semibold : .medium))
+                if active {
+                    Image(systemName: store.sortOrder == .ascending ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 7.5, weight: .bold))
+                }
+            }
+            .foregroundStyle(active ? LogXTheme.accentLight : LogXTheme.muted)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(active ? LogXTheme.chipOn : Color.clear, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
         }
-        .font(.system(size: 9.5, weight: .bold))
-        .tracking(0.9)
-        .foregroundStyle(LogXTheme.muted2)
+        .buttonStyle(.plain)
+        .help("\(title) bo'yicha saralash")
+    }
+
+    private var columnHeader: some View {
+        HStack(spacing: 6) {
+            Text("SARALASH")
+                .font(LogXType.ui(LogXType.caption, .semibold))
+                .tracking(0.6)
+                .foregroundStyle(LogXTheme.muted2)
+            headerButton("Metod", field: .method)
+            headerButton("Kod", field: .status)
+            headerButton("Manzil", field: .path)
+            headerButton("Davom", field: .duration)
+            if showTimeColumn {
+                headerButton("Vaqt", field: .time)
+            }
+            Spacer(minLength: 0)
+            if showAppColumn {
+                Text("ILOVA")
+                    .font(LogXType.ui(LogXType.caption, .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(LogXTheme.muted2)
+            }
+        }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .background(LogXTheme.well)
@@ -101,11 +128,18 @@ struct RequestList: View {
 
     private var list: some View {
         VStack(spacing: 0) {
+            LatencyTimelineView()
             columnHeader
             Divider().overlay(LogXTheme.divider)
             ScrollViewReader { proxy in
                 List(store.visibleLogs) { log in
-                    RequestRow(log: log, selected: store.selectedKey == log.key, now: now)
+                    RequestRow(
+                        log: log,
+                        selected: store.selectedKey == log.key,
+                        now: now,
+                        showAppColumn: showAppColumn,
+                        showTimeColumn: showTimeColumn
+                    )
                         .id(log.key)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -114,17 +148,14 @@ struct RequestList: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .environment(\.defaultMinListRowHeight, 40)
+                .environment(\.defaultMinListRowHeight, 52)
                 .focusable()
                 .focusEffectDisabled()
                 .focused($listFocused)
                 .simultaneousGesture(TapGesture().onEnded { listFocused = true })
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .up: store.moveSelection(by: -1)
-                    case .down: store.moveSelection(by: 1)
-                    default: break
-                    }
+                .onMoveCommand { dir in
+                    if dir == .up { store.moveSelection(by: -1) }
+                    else if dir == .down { store.moveSelection(by: 1) }
                 }
                 .onExitCommand { store.clearSelection() }
                 .onReceive(NotificationCenter.default.publisher(for: LogXNotice.focusList)) { _ in
@@ -134,9 +165,8 @@ struct RequestList: View {
                 .onKeyPress(.upArrow) { store.moveSelection(by: -1); return .handled }
                 .onKeyPress(.downArrow) { store.moveSelection(by: 1); return .handled }
                 .onChange(of: store.selectedKey) { _, key in
-                    guard !store.followLatest, let key,
-                          store.visibleLogs.contains(where: { $0.key == key }) else { return }
-                    proxy.scrollTo(key, anchor: .center)
+                    guard let key, store.visibleLogs.contains(where: { $0.key == key }) else { return }
+                    proxy.scrollTo(key, anchor: store.followLatest ? .top : .center)
                 }
                 .id(listScope)
             }
@@ -205,27 +235,24 @@ struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(toast.text)
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(LogXTheme.text)
-                .lineLimit(1)
+            Text(toast.text).font(.system(size: 11.5, weight: .medium)).foregroundStyle(LogXTheme.text).lineLimit(1)
             if let title = toast.actionTitle, let action = toast.action {
-                Button(title) {
-                    action()
-                    dismiss()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(LogXTheme.accentLight)
+                Button(title) { action(); dismiss() }
+                    .buttonStyle(.plain).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(LogXTheme.accentLight)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(LogXTheme.panel2, in: Capsule())
-        .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(LogXTheme.panel2, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .onTapGesture(perform: dismiss)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)
     }
 }
+
+private struct RequestListWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 560
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+

@@ -298,7 +298,7 @@ final class InspectorCompleteTests: XCTestCase {
         let missing = InspectorPrefs.load(defaults: defaults)
         XCTAssertEqual(missing, .default)
         XCTAssertTrue(missing.hideNoise)
-        XCTAssertFalse(missing.followLatest)
+        XCTAssertTrue(missing.followLatest)
         XCTAssertFalse(missing.slowOnly)
         XCTAssertEqual(missing.selectedMethod, "ALL")
         XCTAssertEqual(missing.status, StatusClass.all.rawValue)
@@ -326,7 +326,7 @@ final class InspectorCompleteTests: XCTestCase {
         defaults.set(Data("{}".utf8), forKey: InspectorPrefs.storageKey)
         let partial = InspectorPrefs.load(defaults: defaults)
         XCTAssertTrue(partial.hideNoise)
-        XCTAssertFalse(partial.followLatest)
+        XCTAssertTrue(partial.followLatest)
 
         defaults.set(Data("not-json".utf8), forKey: InspectorPrefs.storageKey)
         XCTAssertEqual(InspectorPrefs.load(defaults: defaults), .default)

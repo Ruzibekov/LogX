@@ -61,6 +61,50 @@ extension LogStore {
         }
     }
 
+    func openReplayComposer(_ log: NetworkLog) {
+        replayComposerLog = log
+    }
+
+    func closeReplayComposer() {
+        replayComposerLog = nil
+    }
+
+    func replayCustom(original: NetworkLog, method: String, url: URL, headers: [String: String], body: String?) {
+        closeReplayComposer()
+        flash("Yuborilmoqda · \(method) \(url.path)", ttl: Replay.timeout)
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await Replay.performCustom(method: method, url: url, headers: headers, body: body)
+            self.finishCustomReplay(of: original, result: result, method: method, url: url.absoluteString, headers: headers, body: body)
+        }
+    }
+
+    func finishCustomReplay(of original: NetworkLog, result: ReplayResult, method: String, url: String, headers: [String: String], body: String?) {
+        let key = Replay.keyPrefix + UUID().uuidString
+        var replayed = Replay.log(
+            from: result,
+            original: original,
+            key: key,
+            ts: Date().timeIntervalSince1970 * 1000,
+            method: method,
+            url: url,
+            requestHeaders: headers,
+            requestBody: body
+        )
+        if (replayed.serial ?? "").isEmpty { replayed.serial = "mac" }
+        insertReplay(replayed)
+        selectLog(replayed)
+        let summary: String
+        if let code = result.statusCode {
+            summary = "Qayta yuborildi · \(code) · \(result.durationMs) ms"
+        } else {
+            summary = "Qayta yuborish xato · \(result.error ?? "noma'lum")"
+        }
+        flash(summary, actionTitle: "Asl bilan solishtirish", ttl: 8) { [weak self] in
+            self?.compare(original, replayed)
+        }
+    }
+
     func insertReplay(_ log: NetworkLog) {
         liveByKey[log.key] = log
         if let ts = log.ts { lastActivityTs = max(lastActivityTs ?? 0, ts) }

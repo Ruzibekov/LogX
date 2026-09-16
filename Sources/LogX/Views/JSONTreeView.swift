@@ -88,7 +88,7 @@ struct JSONTreeView: View {
     private func toolbar(rows: Int) -> some View {
         HStack(spacing: 8) {
             Text("\(tree.count) tugun · \(rows) qator")
-                .font(.system(size: 10.5, design: .monospaced))
+                .font(LogXType.mono(LogXType.caption))
                 .foregroundStyle(LogXTheme.muted2)
             Spacer(minLength: 0)
             treeButton("Hammasini yoyish", icon: "arrow.up.left.and.arrow.down.right") {
@@ -183,14 +183,14 @@ private struct JSONTreeRow<Menu: View>: View {
                     .lineLimit(1)
                     .layoutPriority(1)
                 Text(":")
-                    .font(.system(size: 11.5, design: .monospaced))
+                    .font(LogXType.mono(LogXType.body))
                     .foregroundStyle(JSONHighlighter.spanColor(.punct))
             }
             if node.kind.isContainer {
                 containerValue
             } else {
                 Text(node.displayValue)
-                    .font(.system(size: 11.5, design: .monospaced))
+                    .font(LogXType.mono(LogXType.body))
                     .foregroundStyle(scalarColor(node.kind))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -224,17 +224,17 @@ private struct JSONTreeRow<Menu: View>: View {
             Text(node.childCount == 0 ? node.openBracket + node.closeBracket
                  : isCollapsed ? node.openBracket + "…" + node.closeBracket
                  : node.openBracket)
-                .font(.system(size: 11.5, design: .monospaced))
+                .font(LogXType.mono(LogXType.body))
                 .foregroundStyle(JSONHighlighter.spanColor(.punct))
             if node.childCount > 0 {
                 Text("\(node.childCount) ta")
                     .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                     .foregroundStyle(LogXTheme.muted2)
                     .fixedSize()
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 4.5)
                     .padding(.vertical, 1)
-                    .background(Capsule().fill(LogXTheme.well))
-                    .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
+                    .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(LogXTheme.well))
+                    .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
             }
         }
     }

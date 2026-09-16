@@ -28,15 +28,14 @@ struct RequestEmptyView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "terminal")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 11, weight: .semibold))
                             Text("adb devices nusxalash")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(LogXType.ui(LogXType.body, .semibold))
                         }
                         .foregroundStyle(LogXTheme.text2)
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(Capsule().fill(LogXTheme.panel2))
-                        .overlay(Capsule().stroke(LogXTheme.line, lineWidth: 1))
+                        .padding(.vertical, 8)
+                        .background(LogXTheme.panel2, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .help("Terminalda tekshiring: qurilma «unauthorized» bo'lsa telefonda ruxsat bering")
@@ -72,6 +71,8 @@ struct RequestEmptyView: View {
                     ) {
                         if store.canUndoClear {
                             undoClearButton
+                        } else if store.connection == .live {
+                            startSteps
                         }
                     }
                 } else if store.hasActiveFilter {
@@ -90,47 +91,60 @@ struct RequestEmptyView: View {
     }
 
     private var reconnectButton: some View {
-        Button {
+        primaryCTA(icon: "arrow.clockwise", title: "Qayta ulash") {
             Task { await store.start() }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .bold))
-                Text("Qayta ulash")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundStyle(LogXTheme.text)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(LogXTheme.accent))
-            .shadow(color: LogXTheme.glow, radius: 6, y: 2)
         }
-        .buttonStyle(.plain)
         .padding(.top, 4)
     }
 
     private var undoClearButton: some View {
-        Button {
+        primaryCTA(icon: "arrow.uturn.backward", title: "Tozalashni bekor qilish") {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                 store.undoClear()
             }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 11, weight: .bold))
-                Text("Tozalashni bekor qilish")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundStyle(LogXTheme.text)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(LogXTheme.accent))
-            .shadow(color: LogXTheme.glow, radius: 6, y: 2)
         }
-        .buttonStyle(.plain)
         .keyboardShortcut("k", modifiers: [.command, .option])
         .help("Tozalangan so'rovlarni qaytarish (⌥⌘K)")
         .padding(.top, 4)
+    }
+
+    private var startSteps: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            step(1, "Telefonda kuzatiladigan ilovani oching")
+            step(2, "Ilovada tarmoqqa chiqadigan amalni bajaring")
+            step(3, "So'rov shu ro'yxatda darhol ko'rinadi")
+        }
+        .padding(.top, 2)
+        .padding(.bottom, 2)
+    }
+
+    private func step(_ index: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 9) {
+            Text("\(index)")
+                .font(LogXType.mono(LogXType.caption, .bold))
+                .foregroundStyle(LogXTheme.accent)
+                .frame(width: 18, height: 18)
+                .background(LogXTheme.chipOn, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            Text(text)
+                .font(LogXType.ui(LogXType.body))
+                .foregroundStyle(LogXTheme.text2)
+        }
+    }
+
+    private func primaryCTA(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(LogXType.ui(LogXType.body, .semibold))
+            }
+            .foregroundStyle(LogXTheme.onAccent)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(LogXTheme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private var filterEmpty: some View {
@@ -140,22 +154,10 @@ struct RequestEmptyView: View {
             title: "Filterga mos so'rov yo'q",
             subtitle: "Jami \(store.allLogs.count) ta jonli — boshqa ilova yoki status."
         ) {
-            Button {
+            primaryCTA(icon: "arrow.counterclockwise", title: "Filtrlarni tozalash") {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                     store.clearFilters()
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("Filtrlarni tozalash")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(LogXTheme.text)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(LogXTheme.accent))
-                .shadow(color: LogXTheme.glow, radius: 6, y: 2)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -169,22 +171,10 @@ struct RequestEmptyView: View {
             title: "Hammasi shovqin",
             subtitle: "\(store.noiseHiddenCount) ta so'rov analitika/health sifatida yashirilgan."
         ) {
-            Button {
+            primaryCTA(icon: "eye", title: "Shovqinni ko'rsatish") {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                     store.toggleHideNoise()
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "eye")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("Shovqinni ko'rsatish")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(LogXTheme.text)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(LogXTheme.accent))
-                .shadow(color: LogXTheme.glow, radius: 6, y: 2)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -198,24 +188,12 @@ struct RequestEmptyView: View {
             title: "Bu USB da jonli so'rov yo'q",
             subtitle: "Jami \(store.allLogs.count) ta jonli — boshqa ulangan qurilma."
         ) {
-            Button {
+            primaryCTA(icon: "macbook.and.iphone", title: "Barchasini ko'rish") {
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     store.selectAllDevices()
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "macbook.and.iphone")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("Barchasini ko'rish")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(LogXTheme.text)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(LogXTheme.accent))
-                .shadow(color: LogXTheme.glow, radius: 6, y: 2)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -232,22 +210,23 @@ struct RequestEmptyView: View {
     ) -> some View {
         VStack(spacing: 14) {
             ZStack {
-                Circle()
-                    .fill(tint.opacity(0.1))
-                    .frame(width: 64, height: 64)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(tint.opacity(0.12))
+                    .frame(width: 56, height: 56)
                 Image(systemName: icon)
-                    .font(.system(size: 26, weight: .light))
+                    .font(.system(size: 24, weight: .regular))
                     .foregroundStyle(tint)
             }
             VStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(LogXType.ui(LogXType.title, .semibold))
                     .foregroundStyle(LogXTheme.text)
                     .multilineTextAlignment(.center)
                 Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(LogXTheme.muted)
+                    .font(LogXType.ui(LogXType.body))
+                    .foregroundStyle(LogXTheme.text2)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: 460)
             }
             extra()
         }

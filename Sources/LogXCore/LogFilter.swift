@@ -84,6 +84,36 @@ public enum LogFilter {
         return false
     }
 
+    public static func matchesSmartQuery(_ log: NetworkLog, query: String) -> Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        let tokens = trimmed.split(separator: " ").map(String.init)
+        for token in tokens {
+            if token.hasPrefix("status:") || token.hasPrefix("code:") {
+                let val = token.dropFirst(token.hasPrefix("status:") ? 7 : 5)
+                if val.hasSuffix("xx") {
+                    let prefix = val.prefix(1)
+                    let codePrefix = log.responseCode.map { String($0).prefix(1) } ?? ""
+                    if codePrefix != prefix { return false }
+                } else if let code = Int(val) {
+                    if log.responseCode != code { return false }
+                }
+            } else if token.hasPrefix("method:") || token.hasPrefix("m:") {
+                let val = token.dropFirst(token.hasPrefix("method:") ? 7 : 2)
+                if log.method.caseInsensitiveCompare(String(val)) != .orderedSame { return false }
+            } else if token.hasPrefix("host:") {
+                let val = String(token.dropFirst(5))
+                if !log.hostLabel.localizedCaseInsensitiveContains(val) { return false }
+            } else if token.hasPrefix("path:") {
+                let val = String(token.dropFirst(5))
+                if !log.pathOnly.localizedCaseInsensitiveContains(val) { return false }
+            } else {
+                if !matchesQuery(log, query: token) { return false }
+            }
+        }
+        return true
+    }
+
     public static func matchesMethod(_ log: NetworkLog, method: String) -> Bool {
         let m = method.trimmingCharacters(in: .whitespacesAndNewlines)
         if m.isEmpty || m.uppercased() == "ALL" { return true }

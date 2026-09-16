@@ -8,6 +8,7 @@ Test: `swift test`
 
 ## HARD
 
+- **Har bir o'zgarishdan keyin release run qilinadi (Qoida):** `bash scripts/run.sh` orqali ilovani release build qilib ishga tushirish shart.
 - **REAL test TAQIQ.** Agent REAL-VERIFY / live QA / `qa` spawn / full-qa / desktop-27 / picky live surface qilmaydi.
 - Done = `swift test` exit 0 (+ kerak bo‘lsa fl-verifier). Live sirt — operator yoki boshqa (FL) project.
 - REAL-VERIFY faqat boshqa client projectlar uchun.

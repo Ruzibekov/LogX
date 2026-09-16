@@ -1,33 +1,37 @@
+import AppKit
 import SwiftUI
 import LogXCore
 
 enum LogXTheme {
-    static let bg = Color(red: 0.059, green: 0.063, blue: 0.071)      // #0F1012
-    static let panel = Color(red: 0.082, green: 0.086, blue: 0.098)   // #151619
-    static let panel2 = Color(red: 0.110, green: 0.118, blue: 0.133)  // #1C1E22
-    static let well = Color(red: 0.071, green: 0.075, blue: 0.086)    // #121316
-    static let line = Color(red: 0.169, green: 0.180, blue: 0.204)    // #2B2E34
-    static let divider = Color(red: 0.125, green: 0.133, blue: 0.149) // #202226
+    static let bg = dynamic(dark: 0x0C0E11, light: 0xEFF2F6)
+    static let panel = dynamic(dark: 0x131619, light: 0xF8FAFC)
+    static let panel2 = dynamic(dark: 0x181C21, light: 0xE7ECF2)
+    static let well = dynamic(dark: 0x0A0C0F, light: 0xF2F5F9)
+    static let line = dynamic(dark: 0x23282F, light: 0xDDE2E8)
+    static let divider = dynamic(dark: 0x1B1F25, light: 0xE7EBF0)
 
-    static let text = Color(red: 0.949, green: 0.953, blue: 0.961)    // #F2F3F5
-    static let text2 = Color(red: 0.788, green: 0.800, blue: 0.824)   // #C9CCD2
-    static let muted = Color(red: 0.549, green: 0.569, blue: 0.604)   // #8C919A
-    static let muted2 = Color(red: 0.541, green: 0.561, blue: 0.600)  // #8A8F99 (AA 5.8:1 on bg)
+    static let text = dynamic(dark: 0xECEFF3, light: 0x141821)
+    static let text2 = dynamic(dark: 0xA7B0BC, light: 0x3F4855)
+    static let muted = dynamic(dark: 0x6E7885, light: 0x59626F)
+    static let muted2 = dynamic(dark: 0x4C545F, light: 0x737C89)
 
-    static let accent = Color(red: 0.357, green: 0.553, blue: 0.937)      // #5B8DEF
-    static let accentLight = Color(red: 0.541, green: 0.690, blue: 0.961) // #8AB0F5
-    static let ok = Color(red: 0.239, green: 0.745, blue: 0.478)          // #3DBE7A
-    static let warn = Color(red: 0.878, green: 0.651, blue: 0.231)        // #E0A63B
-    static let err = Color(red: 0.933, green: 0.416, blue: 0.439)         // #EE6A70 (AA on 20% tint)
-    static let method = accentLight
+    static let accent = dynamic(dark: 0x1FB6D4, light: 0x0A6073)
+    static let onAccent = dynamic(dark: 0x06222A, light: 0xF8FAFC)
+    static let accentLight = dynamic(dark: 0x63D3E8, light: 0x0A6073)
+    static let ok = dynamic(dark: 0x2FBF71, light: 0x1A7A44)
+    static let warn = dynamic(dark: 0xE0A23C, light: 0xA96B0C)
+    static let err = dynamic(dark: 0xE5534B, light: 0xC0392F)
+    static let replay = dynamic(dark: 0x8D7BEA, light: 0x6B5BD0)
+    static let barTrack = dynamic(dark: 0x2B424D, light: 0xB7C4D0)
+
+    static let method = text2
     static let net = muted
 
-    static let selection = accent.opacity(0.14)
-    static let selectionEdge = accent.opacity(0.35)
-    static let chipOn = accent.opacity(0.16)
+    static let selection = accent.opacity(0.10)
+    static let selectionEdge = accent.opacity(0.32)
+    static let chipOn = accent.opacity(0.14)
     static let chipOnEdge = accent.opacity(0.45)
-    static let focusRing = accent.opacity(0.6)
-    static let glow = accent.opacity(0.22)
+    static let focusRing = accent.opacity(0.75)
 
     /// Metod rang bilan emas, vazn bilan ajratiladi; faqat DELETE ogohlantiradi.
     static func methodColor(_ method: String) -> Color {
@@ -48,41 +52,59 @@ enum LogXTheme {
         case .all: return text
         }
     }
+
+    static func statusTint(_ cls: LogXCore.StatusClass) -> Color {
+        status(cls).opacity(0.13)
+    }
+
+    static func dynamicNS(dark: Int, light: Int) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(rgbHex: isDark ? dark : light)
+        }
+    }
+
+    static func dynamic(dark: Int, light: Int) -> Color {
+        Color(nsColor: dynamicNS(dark: dark, light: light))
+    }
+}
+
+enum LogXType {
+    static let caption: CGFloat = 10
+    static let meta: CGFloat = 12
+    static let body: CGFloat = 13
+    static let title: CGFloat = 14
+    static let display: CGFloat = 22
+
+    static func ui(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font {
+        .system(size: size, weight: weight)
+    }
+
+    static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .monospaced)
+    }
+}
+
+extension NSColor {
+    convenience init(rgbHex: Int) {
+        self.init(
+            srgbRed: CGFloat((rgbHex >> 16) & 0xFF) / 255,
+            green: CGFloat((rgbHex >> 8) & 0xFF) / 255,
+            blue: CGFloat(rgbHex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
 }
 
 struct ConnectionDot: View {
     var tint: Color
     var pulsing: Bool
 
-    @State private var pulse = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(tint)
-                .frame(width: 7, height: 7)
-            if pulsing {
-                Circle()
-                    .stroke(tint.opacity(0.4), lineWidth: 2)
-                    .frame(width: 13, height: 13)
-                    .scaleEffect(pulse ? 1.28 : 1.0)
-                    .opacity(pulse ? 0.25 : 0.85)
-            }
-        }
-        .frame(width: 16, height: 16)
-        .onAppear {
-            if pulsing, !reduceMotion { pulse = true }
-        }
-        .onChange(of: pulsing) { _, on in
-            pulse = on && !reduceMotion
-        }
-        .animation(
-            pulsing && !reduceMotion
-                ? .spring(response: 0.9, dampingFraction: 0.42).repeatForever(autoreverses: true)
-                : .spring(response: 0.28, dampingFraction: 0.86),
-            value: pulse
-        )
-        .accessibilityHidden(true)
+        Image(systemName: pulsing ? "bolt.horizontal.circle.fill" : "circle")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 14, height: 14)
+            .accessibilityHidden(true)
     }
 }

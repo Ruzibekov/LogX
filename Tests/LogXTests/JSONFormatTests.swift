@@ -112,6 +112,28 @@ final class JSONFormatTests: XCTestCase {
         XCTAssertTrue(pretty.contains("items:"))
     }
 
+    func testChunkedBoundaryFormatting() {
+        let raw = """
+        {"error":null,"data":[{"area_id":301,"org_id":
+        der":null,"business_sub_direction":null,"problems_new":0},{"org_direction":null,"id":null,"object_name":"RASULJONOV"}]}
+        """
+        let pretty = JSONFormat.pretty(raw)
+        XCTAssertTrue(pretty.contains("\"business_sub_direction\": null"), pretty)
+        XCTAssertTrue(pretty.contains("\"org_direction\": null"), pretty)
+        XCTAssertTrue(pretty.contains("\n      \"org_direction\": null"), pretty)
+    }
+
+    func testChunkedBoundaryWithUzbekApostropheAndSplitString() {
+        let raw = """
+        {"data":[{"name":"UZOKOV O'G'LI","notes":"cut_
+        suffix","city":"Tashkent"},{"leader":"AZIMJONOV O‘G‘LI"}]}
+        """
+        let pretty = JSONFormat.pretty(raw)
+        XCTAssertTrue(pretty.contains("\"name\": \"UZOKOV O'G'LI\""), pretty)
+        XCTAssertTrue(pretty.contains("\"city\": \"Tashkent\""), pretty)
+        XCTAssertTrue(pretty.contains("\"leader\": \"AZIMJONOV O‘G‘LI\""), pretty)
+    }
+
     func testLooseTextDecodesArbitraryJSONStructure() throws {
         let json = """
         {

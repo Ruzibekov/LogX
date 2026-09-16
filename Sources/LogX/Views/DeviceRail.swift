@@ -39,7 +39,7 @@ struct DeviceRail: View {
                                         .font(.system(size: 12))
                                         .foregroundStyle(LogXTheme.muted2)
                                     Text("USB yo'q — telefonni ulang")
-                                        .font(.system(size: 11.5))
+                                        .font(LogXType.ui(LogXType.body))
                                         .foregroundStyle(LogXTheme.muted2)
                                 }
                                 .padding(.horizontal, 12)
@@ -76,7 +76,7 @@ struct DeviceRail: View {
                                         .font(.system(size: 12))
                                         .foregroundStyle(LogXTheme.muted2)
                                     Text("Hali so'rov yo'q")
-                                        .font(.system(size: 11.5))
+                                        .font(LogXType.ui(LogXType.body))
                                         .foregroundStyle(LogXTheme.muted2)
                                 }
                                 .padding(.horizontal, 12)
@@ -95,18 +95,18 @@ struct DeviceRail: View {
                                 Image(systemName: store.favoritesOnly ? "star.fill" : "star")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(store.favoritesOnly ? LogXTheme.warn : LogXTheme.muted2)
-                                Text(store.favoritesOnly ? "★ SEVIMLILAR (faol)" : "★ SEVIMLILAR")
-                                    .font(.system(size: 10.5, weight: .bold))
-                                    .tracking(0.9)
+                                Text(store.favoritesOnly ? "SEVIMLILAR (faol)" : "SEVIMLILAR")
+                                    .font(LogXType.ui(LogXType.meta, .semibold))
+                                    .tracking(0.6)
                                     .foregroundStyle(store.favoritesOnly ? LogXTheme.text : LogXTheme.muted)
                                 Spacer()
                                 if store.liveFavoriteCount > 0 {
                                     Text("\(store.liveFavoriteCount)")
-                                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                                        .padding(.horizontal, 7)
+                                        .font(LogXType.mono(LogXType.caption, .bold))
+                                        .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(
-                                            Capsule()
+                                            RoundedRectangle(cornerRadius: 4, style: .continuous)
                                                 .fill(store.favoritesOnly ? LogXTheme.warn.opacity(0.25) : LogXTheme.panel2)
                                         )
                                         .foregroundStyle(store.favoritesOnly ? LogXTheme.warn : LogXTheme.muted)
@@ -115,11 +115,11 @@ struct DeviceRail: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
                                     .fill(store.favoritesOnly ? LogXTheme.warn.opacity(0.14) : Color.clear)
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
                                     .stroke(store.favoritesOnly ? LogXTheme.warn.opacity(0.35) : Color.clear, lineWidth: 1)
                             )
                         }
@@ -138,10 +138,11 @@ struct DeviceRail: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(store.connection.title)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(LogXType.mono(LogXType.meta, .semibold))
                         .foregroundStyle(store.connection == .serverDown ? LogXTheme.err : LogXTheme.text)
+                        .lineLimit(1)
                     Text(store.connection.subtitle)
-                        .font(.system(size: 9.5))
+                        .font(LogXType.ui(LogXType.caption))
                         .foregroundStyle(LogXTheme.muted2)
                         .lineLimit(1)
                 }
@@ -156,13 +157,15 @@ struct DeviceRail: View {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 9, weight: .bold))
                             Text("Qayta ulash")
+                                .lineLimit(1)
                         }
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .font(LogXType.ui(LogXType.meta, .semibold))
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(LogXTheme.accentLight)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(LogXTheme.chipOn, in: Capsule())
-                        .overlay(Capsule().stroke(LogXTheme.chipOnEdge, lineWidth: 1))
+                        .background(LogXTheme.chipOn, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(LogXTheme.chipOnEdge, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
@@ -194,8 +197,8 @@ struct DeviceRail: View {
             Image(systemName: icon)
                 .font(.system(size: 9.5, weight: .bold))
             Text(raw)
-                .font(.system(size: 10, weight: .bold))
-                .tracking(1.0)
+                .font(LogXType.ui(LogXType.caption, .semibold))
+                .tracking(0.6)
         }
         .foregroundStyle(LogXTheme.muted2)
         .padding(.horizontal, 8)
@@ -243,110 +246,5 @@ struct DeviceRail: View {
             return "ipad.gen2"
         }
         return "iphone.gen3"
-    }
-}
-
-private struct DeviceRowView: View {
-    var title: String
-    var subtitle: String?
-    var icon: String
-    var isOnline: Bool
-    var selected: Bool
-    var action: () -> Void
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(selected ? LogXTheme.accentLight : (isOnline ? LogXTheme.ok : LogXTheme.muted2))
-                    .frame(width: 20)
-
-                VStack(alignment: .leading, spacing: 1.5) {
-                    Text(title)
-                        .font(.system(size: 12, weight: selected ? .semibold : .medium))
-                        .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
-                        .lineLimit(1)
-                    if let subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.system(size: 9.5, design: .monospaced))
-                            .foregroundStyle(LogXTheme.muted2)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer(minLength: 0)
-
-                if selected {
-                    Circle()
-                        .fill(LogXTheme.accentLight)
-                        .frame(width: 5, height: 5)
-                        .shadow(color: LogXTheme.chipOnEdge, radius: 3)
-                }
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? LogXTheme.chipOn : (hovered ? LogXTheme.panel2 : Color.clear))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(selected ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-    }
-}
-
-private struct AppRowView: View {
-    var title: String
-    var pkg: String
-    var count: Int
-    var selected: Bool
-    var action: () -> Void
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "app.dashed")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(selected ? LogXTheme.accentLight : LogXTheme.muted)
-                    .frame(width: 20)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 12, weight: selected ? .semibold : .medium))
-                        .foregroundStyle(selected ? LogXTheme.text : LogXTheme.text2)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-
-                Text("\(count)")
-                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                    .foregroundStyle(selected ? LogXTheme.accentLight : LogXTheme.muted)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(selected ? LogXTheme.chipOn : LogXTheme.well)
-                    )
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? LogXTheme.chipOn : (hovered ? LogXTheme.panel2 : Color.clear))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(selected ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
     }
 }

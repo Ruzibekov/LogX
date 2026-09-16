@@ -84,4 +84,15 @@ final class InspectorSurfaceTests: XCTestCase {
         XCTAssertTrue(rail.contains("disablesAnimations"), rail)
         XCTAssertTrue(rail.contains("setScope"), rail)
     }
+
+    func testCommandFJSONFindRouting() throws {
+        let app = try source("Sources/LogX/LogXApp.swift")
+        XCTAssertTrue(app.contains("add(findMenu, \"JSON ichida topish\", #selector(focusDetailFind(_:)), \"f\", .command, target: self)"), app)
+        XCTAssertTrue(app.contains("add(findMenu, \"So'rovlarni qidirish\", #selector(focusListSearch(_:)), \"f\", [.command, .shift], target: self)"), app)
+        XCTAssertTrue(app.contains("if store?.selectedLog != nil"), app)
+        XCTAssertTrue(app.contains("NotificationCenter.default.post(name: LogXNotice.focusDetailFind, object: nil)"), app)
+        XCTAssertTrue(app.contains("focusListSearch(sender)"), app)
+        let findBar = try source("Sources/LogX/Views/DetailFindBar.swift")
+        XCTAssertTrue(findBar.contains("JSON ichida topish (⌘F)"), findBar)
+    }
 }

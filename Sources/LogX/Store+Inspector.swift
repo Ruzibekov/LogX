@@ -57,12 +57,32 @@ extension LogStore {
         cachedStatusCounts = counts
         cachedErrorCount = (counts[.err4xx] ?? 0) + (counts[.err5xx] ?? 0) + (counts[.net] ?? 0)
 
+        var sorted = base
+        if sortField != .time || sortOrder != .descending {
+            sorted.sort { a, b in
+                let comp: Bool
+                switch sortField {
+                case .time:
+                    comp = (a.ts ?? 0) < (b.ts ?? 0)
+                case .method:
+                    comp = a.method < b.method
+                case .status:
+                    comp = (a.responseCode ?? 0) < (b.responseCode ?? 0)
+                case .duration:
+                    comp = (a.durationMs ?? 0) < (b.durationMs ?? 0)
+                case .path:
+                    comp = a.pathOnly < b.pathOnly
+                }
+                return sortOrder == .ascending ? comp : !comp
+            }
+        }
+
         if errorsOnly {
-            cachedVisibleLogs = base.filter { LogFilter.errorClasses.contains($0.statusClass) }
+            cachedVisibleLogs = sorted.filter { LogFilter.errorClasses.contains($0.statusClass) }
         } else if status == .all {
-            cachedVisibleLogs = base
+            cachedVisibleLogs = sorted
         } else {
-            cachedVisibleLogs = base.filter { $0.statusClass == status }
+            cachedVisibleLogs = sorted.filter { $0.statusClass == status }
         }
         cachedVisibleKeys = Set(cachedVisibleLogs.map(\.key))
         cachedEndpointCounts = EndpointIdentity.counts(in: cachedVisibleLogs)
@@ -90,7 +110,7 @@ extension LogStore {
             if let cached = queryMatchCache[log.key] {
                 hit = cached
             } else {
-                hit = LogFilter.matchesQuery(log, query: q)
+                hit = LogFilter.matchesSmartQuery(log, query: q)
                 queryMatchCache[log.key] = hit
             }
             if hit { out.append(log) }

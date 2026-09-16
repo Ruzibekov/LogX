@@ -46,14 +46,18 @@ enum JSONHighlighter {
         return result
     }
 
-    static let bodyFont = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+    static func bodyFont(size: CGFloat = 11.5) -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+    static var bodyFont: NSFont { bodyFont(size: 11.5) }
 
     /// NSTextView uchun: rangli matn + faol topilma diapazoni (scroll uchun).
     static func nsAttributedString(
         for text: String,
-        headers: Bool,
+        headers: Bool = false,
         highlights: [Range<String.Index>] = [],
-        activeIndex: Int? = nil
+        activeIndex: Int? = nil,
+        fontSize: CGFloat = 11.5
     ) -> (text: NSAttributedString, activeRange: NSRange?) {
         let spans: [JSONSpan]
         if headers {
@@ -67,17 +71,18 @@ enum JSONHighlighter {
         let result = NSMutableAttributedString()
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 2
+        let font = bodyFont(size: fontSize)
         for span in spans {
             result.append(NSAttributedString(string: span.text, attributes: [
-                .font: bodyFont,
+                .font: font,
                 .foregroundColor: nsColor(span.kind),
                 .paragraphStyle: paragraph,
             ]))
         }
         var active: NSRange?
         if !highlights.isEmpty {
-            let warnBg = NSColor(srgbRed: 0.878, green: 0.651, blue: 0.231, alpha: 0.42)
-            let accentBg = NSColor(srgbRed: 0.357, green: 0.553, blue: 0.937, alpha: 0.26)
+            let warnBg = LogXTheme.dynamicNS(dark: 0xE0A23C, light: 0xA96B0C).withAlphaComponent(0.42)
+            let accentBg = LogXTheme.dynamicNS(dark: 0x1FB6D4, light: 0x0A6073).withAlphaComponent(0.26)
             for (i, range) in highlights.enumerated() {
                 let nsRange = NSRange(range, in: text)
                 guard nsRange.location != NSNotFound, nsRange.location + nsRange.length <= result.length else { continue }
@@ -90,12 +95,12 @@ enum JSONHighlighter {
 
     static func nsColor(_ kind: JSONSpanKind) -> NSColor {
         switch kind {
-        case .key: return NSColor(srgbRed: 0.878, green: 0.890, blue: 0.910, alpha: 1)    // #E0E3E8
-        case .string: return NSColor(srgbRed: 0.541, green: 0.690, blue: 0.961, alpha: 1) // #8AB0F5
-        case .number: return NSColor(srgbRed: 0.878, green: 0.651, blue: 0.231, alpha: 1) // #E0A63B
-        case .boolNull: return NSColor(srgbRed: 0.239, green: 0.745, blue: 0.478, alpha: 1) // #3DBE7A
-        case .punct: return NSColor(srgbRed: 0.549, green: 0.569, blue: 0.604, alpha: 1)  // #8C919A
-        case .plain: return NSColor(srgbRed: 0.788, green: 0.800, blue: 0.824, alpha: 1)  // #C9CCD2
+        case .key: return LogXTheme.dynamicNS(dark: 0x7DD3FC, light: 0x0B5F86)
+        case .string: return LogXTheme.dynamicNS(dark: 0xCE9178, light: 0x8F4A1E)
+        case .number: return LogXTheme.dynamicNS(dark: 0x86EFAC, light: 0x146B3A)
+        case .boolNull: return LogXTheme.dynamicNS(dark: 0xC586C0, light: 0x6B3FA0)
+        case .punct: return LogXTheme.dynamicNS(dark: 0x94A3B8, light: 0x59626F)
+        case .plain: return LogXTheme.dynamicNS(dark: 0xCBD5E1, light: 0x141821)
         }
     }
 

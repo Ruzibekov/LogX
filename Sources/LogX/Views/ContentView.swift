@@ -15,6 +15,10 @@ struct ContentView: View {
         } detail: {
             RequestDetail()
                 .navigationSplitViewColumnWidth(min: 300, ideal: 420)
+                .sheet(item: Binding(get: { store.replayComposerLog }, set: { store.replayComposerLog = $0 })) { log in
+                    ReplayComposerView(log: log)
+                        .environmentObject(store)
+                }
         }
         .navigationSplitViewStyle(.balanced)
         .background(LogXTheme.bg)
@@ -23,10 +27,33 @@ struct ContentView: View {
                 .environmentObject(store)
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        sidebarVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.leading")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(sidebarVisible ? LogXTheme.accentLight : LogXTheme.text2)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(sidebarVisible ? LogXTheme.chipOn : LogXTheme.well)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(sidebarVisible ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(sidebarVisible ? "Yon panelni yashirish (⌃⌘S)" : "Yon panelni ko'rsatish (⌃⌘S)")
+                .accessibilityLabel("Yon panel")
+            }
             ToolbarItemGroup(placement: .principal) {
                 HStack(spacing: 6) {
-                    Image(systemName: "dot.radiowaves.left.and.right")
-                        .font(.system(size: 10, weight: .bold))
+                    Image(systemName: "cable.connector")
+                        .font(.system(size: 10.5, weight: .bold))
                         .foregroundStyle(LogXTheme.accentLight)
                     Text(scopeTitle)
                         .font(.system(size: 11.5, weight: .semibold))
@@ -34,7 +61,7 @@ struct ContentView: View {
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .padding(.vertical, 4.5)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(LogXTheme.well)
@@ -51,9 +78,9 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: store.isPaused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 11.5, weight: .bold))
                         .foregroundStyle(store.isPaused ? LogXTheme.warn : LogXTheme.text2)
-                        .frame(width: 26, height: 26)
+                        .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(store.isPaused ? LogXTheme.warn.opacity(0.18) : LogXTheme.well)
@@ -74,9 +101,9 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.down.to.line")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 11.5, weight: .bold))
                         .foregroundStyle(store.followLatest ? LogXTheme.accentLight : LogXTheme.text2)
-                        .frame(width: 26, height: 26)
+                        .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(store.followLatest ? LogXTheme.chipOn : LogXTheme.well)
@@ -87,7 +114,7 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help(store.followLatest ? "Kuzat yoqilgan — yangi so'rov tanlanadi (⌘L)" : "Kuzat — yangi so'rovni tanlash (⌘L)")
+                .help(store.followLatest ? "Kuzat yoqilgan — eng yangi so'rov tepada ko'rinadi (⌘L)" : "Kuzat — yangi so'rovni kuzatish (⌘L)")
                 .accessibilityLabel("Kuzat")
                 .accessibilityValue(store.followLatest ? "yoqilgan" : "o'chirilgan")
 
@@ -96,9 +123,9 @@ struct ContentView: View {
                     Button("JSON saqlash") { store.exportJSON() }
                 } label: {
                     Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(store.canExport ? LogXTheme.muted : LogXTheme.muted2)
-                        .frame(width: 26, height: 26)
+                        .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(LogXTheme.well)
@@ -119,9 +146,9 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(LogXTheme.muted)
-                        .frame(width: 26, height: 26)
+                        .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(LogXTheme.well)
@@ -158,9 +185,11 @@ struct ContentView: View {
     }
 }
 
-/// Menyu → ko'rinish fokus buyruqlari (⌘F ro'yxat qidiruvi, ⌥⌘F JSON topish).
 enum LogXNotice {
     static let focusListSearch = Notification.Name("logx.focusListSearch")
     static let focusDetailFind = Notification.Name("logx.focusDetailFind")
     static let focusList = Notification.Name("logx.focusList")
+    static let zoomIn = Notification.Name("logx.zoomIn")
+    static let zoomOut = Notification.Name("logx.zoomOut")
+    static let zoomReset = Notification.Name("logx.zoomReset")
 }

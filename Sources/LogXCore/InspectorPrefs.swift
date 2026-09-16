@@ -14,7 +14,7 @@ public struct InspectorPrefs: Codable, Equatable, Sendable {
 
     public static let `default` = InspectorPrefs(
         hideNoise: true,
-        followLatest: false,
+        followLatest: true,
         slowOnly: false,
         selectedMethod: "ALL",
         status: StatusClass.all.rawValue,
@@ -25,7 +25,7 @@ public struct InspectorPrefs: Codable, Equatable, Sendable {
 
     public init(
         hideNoise: Bool = true,
-        followLatest: Bool = false,
+        followLatest: Bool = true,
         slowOnly: Bool = false,
         selectedMethod: String = "ALL",
         status: String = "all",
@@ -46,7 +46,7 @@ public struct InspectorPrefs: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         hideNoise = try c.decodeIfPresent(Bool.self, forKey: .hideNoise) ?? true
-        followLatest = try c.decodeIfPresent(Bool.self, forKey: .followLatest) ?? false
+        followLatest = try c.decodeIfPresent(Bool.self, forKey: .followLatest) ?? true
         slowOnly = try c.decodeIfPresent(Bool.self, forKey: .slowOnly) ?? false
         let method = try c.decodeIfPresent(String.self, forKey: .selectedMethod) ?? "ALL"
         selectedMethod = method.isEmpty ? "ALL" : method

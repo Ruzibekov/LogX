@@ -167,8 +167,8 @@ final class ThemeAndSelectionTests: XCTestCase {
             XCTAssertFalse(s.contains("accent.opacity("), f)
         }
         let share = try source("Sources/LogX/ShareCardRenderer.swift")
-        XCTAssertFalse(share.contains("0.388, green: 0.400, blue: 0.945"), "share card must use the app palette")
-        XCTAssertTrue(share.contains("0.357, green: 0.553, blue: 0.937"), share)
+        XCTAssertFalse(share.contains("srgbRed:"), "share card must use the app palette")
+        XCTAssertTrue(share.contains("NSColor(rgbHex: 0x1FB6D4)"), share)
         let theme = try source("Sources/LogX/Theme.swift")
         XCTAssertTrue(theme.contains("case .redirect3xx: return text2"), "3xx must not borrow the interactive accent")
     }
@@ -176,7 +176,7 @@ final class ThemeAndSelectionTests: XCTestCase {
     func testListKeyboardAndFollowScrollGuards() throws {
         let list = try source("Sources/LogX/Views/RequestList.swift")
         XCTAssertTrue(list.contains("onMoveCommand"), list)
-        XCTAssertTrue(list.contains("guard !store.followLatest"), "follow mode must not scroll-jump on every batch")
+        XCTAssertTrue(list.contains("anchor: store.followLatest ? .top : .center"), "follow mode pins the newest row at the top; manual selection stays centered")
         XCTAssertTrue(list.contains("listFocused = true"), list)
         let row = try source("Sources/LogX/Views/RequestRow.swift")
         XCTAssertTrue(row.contains(".isSelected"), row)

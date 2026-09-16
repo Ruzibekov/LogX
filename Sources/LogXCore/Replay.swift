@@ -61,6 +61,23 @@ public enum Replay {
         return req
     }
 
+    public static func request(method: String, url: URL, headers: [String: String], body: String?) throws -> URLRequest {
+        guard url.host != nil else { throw BuildError.invalidURL(url.absoluteString) }
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
+        let m = method.uppercased()
+        req.httpMethod = (m == "?" || m.isEmpty) ? "GET" : m
+        for key in headers.keys.sorted() {
+            guard let value = headers[key], !value.isEmpty else { continue }
+            guard !CurlBuilder.droppedHeaders.contains(key.lowercased()) else { continue }
+            req.setValue(value, forHTTPHeaderField: key)
+        }
+        if let body, !body.isEmpty {
+            if CurlBuilder.isOmittedBody(body) { throw BuildError.omittedBody }
+            req.httpBody = body.data(using: .utf8)
+        }
+        return req
+    }
+
     public static func perform(_ log: NetworkLog, session: URLSession = Replay.session) async -> ReplayResult {
         let req: URLRequest
         do {
@@ -68,6 +85,20 @@ public enum Replay {
         } catch {
             return ReplayResult(error: describe(error))
         }
+        return await execute(req, session: session)
+    }
+
+    public static func performCustom(method: String, url: URL, headers: [String: String], body: String?, session: URLSession = Replay.session) async -> ReplayResult {
+        let req: URLRequest
+        do {
+            req = try request(method: method, url: url, headers: headers, body: body)
+        } catch {
+            return ReplayResult(error: describe(error))
+        }
+        return await execute(req, session: session)
+    }
+
+    private static func execute(_ req: URLRequest, session: URLSession) async -> ReplayResult {
         let started = Date()
         do {
             let (data, response) = try await session.data(for: req)
@@ -159,6 +190,44 @@ public enum Replay {
             requestHeaders: sentHeaders,
             responseHeaders: result.headers,
             requestBody: original.requestBody,
+            responseBody: result.body,
+            isFull: true,
+            moduleId: original.moduleId,
+            moduleName: original.moduleName,
+            environment: original.environment,
+            flavor: original.flavor,
+            buildType: original.buildType,
+            sessionId: original.sessionId
+        )
+    }
+
+    public static func log(from result: ReplayResult, original: NetworkLog, key: String, ts: Double, method: String, url: String, requestHeaders: [String: String], requestBody: String?) -> NetworkLog {
+        var sentHeaders: [String: String] = [:]
+        for (k, v) in requestHeaders where !CurlBuilder.droppedHeaders.contains(k.lowercased()) && !v.isEmpty {
+            sentHeaders[k] = v
+        }
+        return NetworkLog(
+            key: key,
+            method: method,
+            url: url,
+            api: url,
+            responseCode: result.statusCode,
+            responseMessage: result.statusMessage,
+            durationMs: result.durationMs,
+            error: result.error,
+            feature: original.feature,
+            packageName: original.packageName,
+            source: sourceTag,
+            appId: original.appId,
+            serial: original.serial,
+            device: original.device,
+            deviceModel: original.deviceModel,
+            deviceName: original.deviceName,
+            appVersion: original.appVersion,
+            ts: ts,
+            requestHeaders: sentHeaders,
+            responseHeaders: result.headers,
+            requestBody: requestBody,
             responseBody: result.body,
             isFull: true,
             moduleId: original.moduleId,

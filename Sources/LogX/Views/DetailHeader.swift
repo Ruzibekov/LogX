@@ -7,94 +7,125 @@ struct DetailHeader: View {
     var log: NetworkLog
     var tab: DetailTab
     @State private var urlCopied = false
+    @AppStorage("logx.detailHeaderCollapsed") private var isCollapsed = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(log.method)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(LogXTheme.methodColor(log.method))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(LogXTheme.panel2)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(LogXTheme.line, lineWidth: 1)
-                    )
+        VStack(alignment: .leading, spacing: isCollapsed ? 6 : 10) {
+            HStack(alignment: .center, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(log.method)
+                        .font(LogXType.mono(LogXType.meta, .bold))
+                        .foregroundStyle(LogXTheme.methodColor(log.method))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LogXTheme.panel2,
+                            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        )
 
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(LogXTheme.status(log.statusClass))
-                        .frame(width: 6, height: 6)
-                    Text(log.responseCode.map(String.init) ?? "NET")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                        .foregroundStyle(LogXTheme.status(log.statusClass))
-                    Text(log.statusDescription)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(LogXTheme.status(log.statusClass))
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(LogXTheme.status(log.statusClass).opacity(0.12))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(LogXTheme.status(log.statusClass).opacity(0.3), lineWidth: 1)
-                )
-
-                if log.durationMs != nil {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 9.5))
-                        Text(log.formattedDuration)
+                    HStack(spacing: 6) {
+                        Text(log.responseCode.map(String.init) ?? "NET")
+                            .font(LogXType.mono(LogXType.meta, .bold))
+                            .foregroundStyle(LogXTheme.status(log.statusClass))
+                        Text(log.statusDescription)
+                            .font(LogXType.ui(LogXType.meta, .semibold))
+                            .foregroundStyle(LogXTheme.status(log.statusClass))
+                            .lineLimit(1)
                     }
-                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                    .foregroundStyle(LogXTheme.muted)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(LogXTheme.line, lineWidth: 1))
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        LogXTheme.statusTint(log.statusClass),
+                        in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    )
+
+                    if isCollapsed, log.durationMs != nil {
+                        Text(log.formattedDuration)
+                            .font(LogXType.mono(LogXType.caption))
+                            .foregroundStyle(LogXTheme.muted)
+                            .chipSurface()
+                            .lineLimit(1)
+                    }
                 }
 
-                Text(bodySizeLabel(log))
-                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                    .foregroundStyle(LogXTheme.muted)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(LogXTheme.line, lineWidth: 1))
-                    .help("Shu tab tanasining hajmi")
+                Spacer(minLength: 8)
 
-                Text(RelativeTime.stamp(ts: log.ts))
-                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                    .foregroundStyle(LogXTheme.muted)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(LogXTheme.line, lineWidth: 1))
-                    .help("So'rov vaqti · \(RelativeTime.label(ts: log.ts))")
+                HStack(spacing: 6) {
+                    HeaderIconButton(
+                        icon: store.isFavorite(log.key) ? "star.fill" : "star",
+                        isHighlighted: store.isFavorite(log.key),
+                        highlightColor: LogXTheme.warn,
+                        help: "Sevimli"
+                    ) {
+                        store.toggleFavorite(log.key)
+                    }
 
-                Spacer()
+                    HeaderIconButton(
+                        icon: isCollapsed ? "chevron.down" : "chevron.up",
+                        isHighlighted: false,
+                        help: isCollapsed ? "Batafsil ma'lumotlarni ko'rsatish" : "Ixcham rejim"
+                    ) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                            isCollapsed.toggle()
+                        }
+                    }
+                }
+            }
 
-                HeaderIconButton(
-                    icon: store.isFavorite(log.key) ? "star.fill" : "star",
-                    isHighlighted: store.isFavorite(log.key),
-                    highlightColor: LogXTheme.warn,
-                    help: "Sevimli"
-                ) {
-                    store.toggleFavorite(log.key)
+            if !isCollapsed {
+                WrapLayout(spacing: 6, lineSpacing: 6) {
+                    if log.durationMs != nil {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 9.5, weight: .semibold))
+                            Text(log.formattedDuration)
+                                .lineLimit(1)
+                        }
+                        .font(LogXType.mono(LogXType.caption))
+                        .foregroundStyle(LogXTheme.muted)
+                        .chipSurface()
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+
+                    Text(bodySizeLabel(log))
+                        .font(LogXType.mono(LogXType.caption))
+                        .foregroundStyle(LogXTheme.muted)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .chipSurface()
+                        .help("Shu tab tanasining hajmi")
+
+                    Text(RelativeTime.stamp(ts: log.ts))
+                        .font(LogXType.mono(LogXType.caption))
+                        .foregroundStyle(LogXTheme.muted)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .chipSurface()
+                        .help("So'rov vaqti · \(RelativeTime.label(ts: log.ts))")
+
+                    metaChip("Ilova", log.appLabel)
+                    metaChip("Qurilma", deviceLabel)
+                    if let env = log.environment, !env.isEmpty {
+                        metaChip("Muhit", [env, log.flavor, log.appVersion].compactMap { $0 }.joined(separator: " · "))
+                    }
+                    if let feature = log.feature, !feature.isEmpty {
+                        metaChip("Modul", log.moduleName ?? feature)
+                    }
+                }
+
+                let identity = identityChips
+                if !identity.isEmpty {
+                    WrapLayout(spacing: 6, lineSpacing: 6) {
+                        ForEach(identity, id: \.key) { chip in
+                            metaChip(chip.key, chip.value)
+                        }
+                    }
                 }
             }
 
             HStack(spacing: 8) {
-                Text(store.shareableURL(log))
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(LogXTheme.text2)
+                Text(URLHighlighter.attributed(store.shareableURL(log), baseFontSize: LogXType.meta))
                     .lineLimit(2)
                     .textSelection(.enabled)
                     .help(store.shareableURL(log))
@@ -107,7 +138,7 @@ struct DetailHeader: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { urlCopied = false }
                 } label: {
                     Image(systemName: urlCopied ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(urlCopied ? LogXTheme.ok : LogXTheme.muted2)
                         .padding(4)
                 }
@@ -126,32 +157,12 @@ struct DetailHeader: View {
                     )
             )
 
-            HStack(spacing: 6) {
-                metaChip("Ilova", log.appLabel)
-                metaChip("Qurilma", deviceLabel)
-                if let env = log.environment, !env.isEmpty {
-                    metaChip("Muhit", [env, log.flavor, log.appVersion].compactMap { $0 }.joined(separator: " · "))
-                }
-                if let feature = log.feature, !feature.isEmpty {
-                    metaChip("Modul", log.moduleName ?? feature)
-                }
-            }
-
-            let identity = identityChips
-            if !identity.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(identity, id: \.key) { chip in
-                        metaChip(chip.key, chip.value)
-                    }
-                }
-            }
-
             if let msg = problemMessage {
                 HStack(spacing: 7) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(LogXType.ui(LogXType.meta, .semibold))
                     Text(msg)
-                        .font(.system(size: 11.5, weight: .medium))
+                        .font(LogXType.ui(LogXType.body))
                 }
                 .foregroundStyle(LogXTheme.warn)
                 .padding(.horizontal, 10)
@@ -166,7 +177,7 @@ struct DetailHeader: View {
                 )
             }
         }
-        .padding(12)
+        .padding(14)
         .background(LogXTheme.panel)
     }
 
@@ -204,27 +215,31 @@ struct DetailHeader: View {
         return msg
     }
 
+    @ViewBuilder
     private func metaChip(_ k: String, _ v: String) -> some View {
+        let trimmed = v.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty, trimmed != "—" {
+            metaChipBody(k, v)
+        }
+    }
+
+    private func metaChipBody(_ k: String, _ v: String) -> some View {
         let masked = v.contains("••")
         return Button {
             store.copy(v, what: k)
         } label: {
             HStack(spacing: 4) {
                 Text(k)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(LogXType.ui(LogXType.caption, .semibold))
                     .foregroundStyle(LogXTheme.muted2)
+                    .lineLimit(1)
                 Text(v)
-                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                    .font(LogXType.mono(LogXType.caption))
                     .foregroundStyle(LogXTheme.text2)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(LogXTheme.line, lineWidth: 1)
-            )
+            .fixedSize(horizontal: true, vertical: false)
+            .chipSurface()
         }
         .buttonStyle(.plain)
         .disabled(masked)
@@ -255,7 +270,7 @@ private struct HeaderIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 11.5, weight: .semibold))
+                .font(LogXType.ui(LogXType.body, .semibold))
                 .foregroundStyle(isHighlighted ? highlightColor : (hovered ? LogXTheme.text : LogXTheme.muted))
                 .frame(width: 28, height: 28)
                 .background(
@@ -271,5 +286,14 @@ private struct HeaderIconButton: View {
         .onHover { hovered = $0 }
         .help(help)
         .accessibilityLabel(help)
+    }
+}
+
+
+private extension View {
+    func chipSurface() -> some View {
+        padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }
