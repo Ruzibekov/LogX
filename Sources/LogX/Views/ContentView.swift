@@ -5,22 +5,30 @@ struct ContentView: View {
     @EnvironmentObject private var store: LogStore
     @AppStorage("logx.sidebarVisible") private var sidebarVisible = true
 
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+
     var body: some View {
-        NavigationSplitView(columnVisibility: visibility) {
-            DeviceRail()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 248, max: 300)
-        } content: {
-            RequestList()
-                .navigationSplitViewColumnWidth(min: 360, ideal: 560)
-        } detail: {
-            RequestDetail()
-                .navigationSplitViewColumnWidth(min: 300, ideal: 420)
-                .sheet(item: Binding(get: { store.replayComposerLog }, set: { store.replayComposerLog = $0 })) { log in
-                    ReplayComposerView(log: log)
-                        .environmentObject(store)
-                }
+        VStack(spacing: 0) {
+        HStack(spacing: 0) {
+            if sidebarVisible {
+                DeviceRail()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+            HSplitView {
+                RequestList()
+                    .frame(minWidth: 380, idealWidth: 460, maxWidth: 620)
+                RequestDetail()
+                    .frame(minWidth: 420, maxWidth: .infinity)
+                    .sheet(item: Binding(get: { store.replayComposerLog }, set: { store.replayComposerLog = $0 })) { log in
+                        ReplayComposerView(log: log)
+                            .environmentObject(store)
+                    }
+            }
         }
-        .navigationSplitViewStyle(.balanced)
+        RequestLiveBar(now: now)
+        }
+        .onReceive(ticker) { now = $0 }
         .background(LogXTheme.bg)
         .sheet(item: Binding(get: { store.diffPair }, set: { store.diffPair = $0 })) { pair in
             DiffView(pair: pair)
@@ -28,143 +36,107 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button {
+                titleBarIcon("sidebar.leading", active: sidebarVisible, help: sidebarVisible ? "Qurilma reykini yashirish" : "Qurilma reykini ko'rsatish", label: "Qurilma reyki") {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                         sidebarVisible.toggle()
                     }
-                } label: {
-                    Image(systemName: "sidebar.leading")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(sidebarVisible ? LogXTheme.accentLight : LogXTheme.text2)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(sidebarVisible ? LogXTheme.chipOn : LogXTheme.well)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(sidebarVisible ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1)
-                        )
                 }
-                .buttonStyle(.plain)
-                .help(sidebarVisible ? "Yon panelni yashirish (⌃⌘S)" : "Yon panelni ko'rsatish (⌃⌘S)")
-                .accessibilityLabel("Yon panel")
             }
-            ToolbarItemGroup(placement: .principal) {
-                HStack(spacing: 6) {
-                    Image(systemName: "cable.connector")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .foregroundStyle(LogXTheme.accentLight)
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(LogXTheme.accent)
+                    Text("LogX")
+                        .font(LogXType.ui(LogXType.title, .bold))
+                        .foregroundStyle(LogXTheme.text)
                     Text(scopeTitle)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(LogXTheme.text2)
+                        .font(LogXType.mono(LogXType.meta))
+                        .foregroundStyle(LogXTheme.muted)
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4.5)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(LogXTheme.well)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(LogXTheme.line, lineWidth: 1)
-                        )
-                )
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        store.togglePause()
-                    }
-                } label: {
-                    Image(systemName: store.isPaused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 11.5, weight: .bold))
-                        .foregroundStyle(store.isPaused ? LogXTheme.warn : LogXTheme.text2)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(store.isPaused ? LogXTheme.warn.opacity(0.18) : LogXTheme.well)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(store.isPaused ? LogXTheme.warn.opacity(0.5) : LogXTheme.line, lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-                .help(store.isPaused ? "Davom ettirish (⌘P)" : "Pauza — yangi so'rovlar buferda to'planadi (⌘P)")
-                .accessibilityLabel(store.isPaused ? "Davom ettirish" : "Pauza")
-                .keyboardShortcut("p", modifiers: .command)
-
-                Button {
+                titleBarIcon(
+                    "arrow.down.to.line",
+                    active: store.followLatest,
+                    help: store.followLatest ? "Kuzat yoqilgan — eng yangi so'rov tepada ko'rinadi (⌘L)" : "Kuzat — yangi so'rovni kuzatish (⌘L)",
+                    label: "Kuzat"
+                ) {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                         store.toggleFollowLatest()
                     }
-                } label: {
-                    Image(systemName: "arrow.down.to.line")
-                        .font(.system(size: 11.5, weight: .bold))
-                        .foregroundStyle(store.followLatest ? LogXTheme.accentLight : LogXTheme.text2)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(store.followLatest ? LogXTheme.chipOn : LogXTheme.well)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(store.followLatest ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1)
-                        )
                 }
-                .buttonStyle(.plain)
-                .help(store.followLatest ? "Kuzat yoqilgan — eng yangi so'rov tepada ko'rinadi (⌘L)" : "Kuzat — yangi so'rovni kuzatish (⌘L)")
-                .accessibilityLabel("Kuzat")
-                .accessibilityValue(store.followLatest ? "yoqilgan" : "o'chirilgan")
+
+                titleBarIcon(
+                    "arrow.clockwise",
+                    active: false,
+                    help: "Monitorga qayta ulanish",
+                    label: "Qayta ulash"
+                ) {
+                    Task { await store.start() }
+                }
 
                 Menu {
                     Button("HAR saqlash") { store.exportHAR() }
                     Button("JSON saqlash") { store.exportJSON() }
                 } label: {
                     Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(store.canExport ? LogXTheme.muted : LogXTheme.muted2)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(LogXTheme.well)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(LogXTheme.line, lineWidth: 1)
-                        )
+                        .frame(width: 30, height: 30)
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 30, height: 30)
                 .disabled(!store.canExport)
                 .help(store.canExport ? "Saqlash — ko'rinadigan sessiya HAR yoki JSON" : "Saqlash uchun ko'rinadigan so'rov yo'q")
                 .accessibilityLabel("Sessiyani saqlash")
 
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        store.clearLogs()
-                    }
+                Menu {
+                    Button(store.redactEnabled ? "Tokenlarni ko'rsatish" : "Tokenlarni yashirish") { store.redactEnabled.toggle() }
+                    Button(store.hideNoise ? "Shovqinni ko'rsatish" : "Shovqinni yashirish") { store.toggleHideNoise() }
+                    Divider()
+                    Button("Ro'yxatni tozalash") { store.clearLogs() }
+                        .disabled(store.allLogs.isEmpty)
+                    Button("Tozalashni bekor qilish") { store.undoClear() }
+                        .disabled(!store.canUndoClear)
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11.5, weight: .semibold))
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(LogXTheme.muted)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(LogXTheme.well)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(LogXTheme.line, lineWidth: 1)
-                        )
+                        .frame(width: 30, height: 30)
                 }
-                .buttonStyle(.plain)
-                .disabled(store.allLogs.isEmpty)
-                .help("Ro'yxatni tozalash (⌘K)")
-                .accessibilityLabel("Ro'yxatni tozalash")
-                .keyboardShortcut("k", modifiers: .command)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 30, height: 30)
+                .help("Ko'rinish sozlamalari")
+                .accessibilityLabel("Sozlamalar")
             }
         }
+    }
+
+    private func titleBarIcon(
+        _ icon: String,
+        active: Bool,
+        help: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(active ? LogXTheme.accent : LogXTheme.muted)
+                .frame(width: 30, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(active ? LogXTheme.chipOn : Color.clear)
+                )
+        }
+        .buttonStyle(LogXPressStyle())
+        .help(help)
+        .accessibilityLabel(label)
+        .accessibilityValue(active ? "yoqilgan" : "o'chirilgan")
     }
 
     private var visibility: Binding<NavigationSplitViewVisibility> {

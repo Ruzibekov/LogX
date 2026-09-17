@@ -10,7 +10,7 @@ final class ShareRetainSourceTests: XCTestCase {
     }
 
     func testSharePickerIsRetainedOnHost() throws {
-        let src = try source("Sources/LogX/Views/RequestDetail.swift")
+        let src = try source("Sources/LogX/Views/RequestDetail.swift") + (try source("Sources/LogX/Views/SharePickerHost.swift"))
         XCTAssertTrue(src.contains("class SharePickerHost"), src)
         XCTAssertTrue(src.contains("private var picker: NSSharingServicePicker?"), src)
         XCTAssertTrue(src.contains("self.picker = picker"), src)
@@ -19,7 +19,7 @@ final class ShareRetainSourceTests: XCTestCase {
     }
 
     func testPresentRetriesWhenViewMissing() throws {
-        let src = try source("Sources/LogX/Views/RequestDetail.swift")
+        let src = try source("Sources/LogX/Views/RequestDetail.swift") + (try source("Sources/LogX/Views/SharePickerHost.swift"))
         XCTAssertFalse(src.contains("guard let view else { return }"), src)
         XCTAssertTrue(src.contains("pendingURL"), src)
         XCTAssertTrue(src.contains("flushPending()"), src)
@@ -64,9 +64,11 @@ final class ShareRetainSourceTests: XCTestCase {
         let src = try source("Sources/LogX/Views/RequestList.swift")
         let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
         let live = try source("Sources/LogX/Views/RequestLiveBar.swift")
-        XCTAssertTrue(src.contains("headerButton(\"Metod\", field: .method)"), src)
-        XCTAssertTrue(src.contains("headerButton(\"Manzil\", field: .path)"), src)
-        XCTAssertTrue(src.contains("headerButton(\"Vaqt\", field: .time)"), src)
+        XCTAssertTrue(filters.contains("sortItem(\"Metod\", field: .method)"), filters)
+        XCTAssertTrue(filters.contains("sortItem(\"Manzil\", field: .path)"), filters)
+        XCTAssertTrue(filters.contains("sortItem(\"Vaqt\", field: .time)"), filters)
+        XCTAssertTrue(src.contains("ListGrouping.rows(store.visibleLogs)"), src)
+        XCTAssertTrue(src.contains("hostHeader(name, count: count)"), src)
         XCTAssertTrue(src.contains("LatencyTimelineView()"), src)
         XCTAssertTrue(src.contains("hostLabel"), src)
         XCTAssertTrue(src.contains("RelativeTime.clock"), src)
@@ -85,10 +87,9 @@ final class ShareRetainSourceTests: XCTestCase {
         XCTAssertTrue(live.contains("RelativeTime.label"), live)
         XCTAssertFalse(src.contains("selectApp(\"all\") {\n                    store.selectApp"), src)
         let rail = try source("Sources/LogX/Views/DeviceRail.swift")
-        XCTAssertTrue(rail.contains("ILOVALAR"), rail)
+        XCTAssertTrue(rail.contains("DeviceBadge.initials(device.title)"), rail)
         XCTAssertTrue(rail.contains("liveApps"), rail)
-        XCTAssertTrue(rail.contains("store.connection.title"), rail)
-        XCTAssertTrue(rail.contains("store.connection.subtitle"), rail)
+        XCTAssertTrue(rail.contains("static let width: CGFloat = 56"), rail)
         XCTAssertTrue(rail.contains("isStreamLive(serial:"), rail)
         XCTAssertFalse(rail.contains("store.serverOK ? \"8787 · jonli\""), rail)
         XCTAssertTrue(live.contains("store.connection.title"), live)

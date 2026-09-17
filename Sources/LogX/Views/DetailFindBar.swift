@@ -18,11 +18,11 @@ struct DetailFindBar: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(LogXTheme.muted2)
-            TextField("JSON ichida topish (⌘F)", text: $query)
+            TextField("Tana ichida qidirish", text: $query)
                 .accessibilityLabel("JSON ichida topish")
                 .focused($focused)
                 .textFieldStyle(.plain)
-                .font(.system(size: 11, design: .monospaced))
+                .font(LogXType.mono(LogXType.meta))
                 .foregroundStyle(LogXTheme.text)
                 .onChange(of: query) { _, _ in
                     index = 0
@@ -41,8 +41,8 @@ struct DetailFindBar: View {
                     focused = true
                 }
             Text(label)
-                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                .foregroundStyle(matchCount == 0 ? LogXTheme.muted2 : LogXTheme.accentLight)
+                .font(LogXType.mono(LogXType.caption, .bold))
+                .foregroundStyle(matchCount == 0 ? LogXTheme.muted2 : LogXTheme.accent)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(matchCount == 0 ? LogXTheme.well : LogXTheme.chipOn))
@@ -53,8 +53,10 @@ struct DetailFindBar: View {
                 .keyboardShortcut("g", modifiers: .command)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(LogXTheme.well)
+        .frame(height: 26)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(LogXTheme.panel2)
+        )
     }
 
     private func step(reverse: Bool) {

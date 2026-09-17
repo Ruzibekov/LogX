@@ -11,27 +11,152 @@ extension RequestDetail {
 
     func resetZoom() { fontSize = 11.5 }
 
-    /// Keng panelda tablar chapda, tugmalar o'ngda — eskirgan ko'rinish.
-    /// Panelda joy qolmaganda ViewThatFits oqim variantiga o'tadi: tablar va
-    /// tugmalar qatorma-qator oqadi, matn o'rtadan yorilmaydi.
     @ViewBuilder
     func tabBar(log: NetworkLog, treeAvailable: Bool?) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 14) {
-                tabButtons(log: log)
-                Spacer(minLength: 8)
-                tabToggles(treeAvailable: treeAvailable)
-            }
-            WrapLayout(spacing: 12, lineSpacing: 6) {
-                tabButtons(log: log)
-                tabToggles(treeAvailable: treeAvailable)
-            }
+        HStack(spacing: 16) {
+            tabButtons(log: log)
+            Spacer(minLength: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.vertical, 2)
         .background(LogXTheme.panel)
         .overlay(alignment: .bottom) { Rectangle().fill(LogXTheme.line).frame(height: 1) }
+    }
+
+    @ViewBuilder
+    func subToolbar(log: NetworkLog, rendered: RenderedBody?, treeAvailable: Bool?) -> some View {
+        HStack(spacing: 8) {
+            viewModeSegment(treeAvailable: treeAvailable)
+            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : (rendered?.matchCount ?? 0))
+                .frame(maxWidth: 320)
+            Spacer(minLength: 8)
+            Text(bodyMeta(log: log, rendered: rendered))
+                .font(LogXType.mono(LogXType.caption))
+                .foregroundStyle(LogXTheme.muted2)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if tab == .request || tab == .response {
+                zoomControls
+            }
+            copyBodyButton(log: log)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(LogXTheme.well)
+        .overlay(alignment: .bottom) { Rectangle().fill(LogXTheme.line).frame(height: 1) }
+    }
+
+    func bodyMeta(log: NetworkLog, rendered: RenderedBody?) -> String {
+        var parts: [String] = []
+        if let rendered {
+            parts.append(ByteSize.label(rendered.text.utf8.count))
+            if rendered.lineCount > 1 { parts.append("\(rendered.lineCount) qator") }
+        }
+        let headers = (tab == .request) ? log.requestHeaders : log.responseHeaders
+        if let type = headers.first(where: { $0.key.lowercased() == "content-type" })?.value {
+            parts.append(type.split(separator: ";").first.map(String.init) ?? type)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    func viewModeSegment(treeAvailable: Bool?) -> some View {
+        switch tab {
+        case .request, .response:
+            HStack(spacing: 2) {
+                segmentButton("Daraxt", active: treeBody, help: treeAvailable == false && treeBody
+                    ? "Tana JSON emas yoki \(JSONTree.nodeLimit) tugundan katta — matn ko'rsatilmoqda"
+                    : "JSON'ni yig'iladigan daraxt sifatida ko'rsatish (⌥-bosish butun shoxni yig'adi)") {
+                    treeBody = true
+                }
+                segmentButton("Matn", active: !treeBody && prettyBody, help: "Formatlangan JSON matni") {
+                    treeBody = false
+                    prettyBody = true
+                }
+                segmentButton("Xom", active: !treeBody && !prettyBody, help: "Serverdan kelgan asl matn") {
+                    treeBody = false
+                    prettyBody = false
+                }
+            }
+            .padding(2)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.panel2))
+            wrapButton
+        case .headers:
+            HStack(spacing: 2) {
+                segmentButton("Jadval", active: headersTableView, help: "Strukturali jadval ko'rinishi") {
+                    headersTableView = true
+                }
+                segmentButton("Matn", active: !headersTableView, help: "Matnli ko'rinish") {
+                    headersTableView = false
+                }
+            }
+            .padding(2)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.panel2))
+            wrapButton
+        case .params:
+            EmptyView()
+        }
+    }
+
+    var wrapButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { toggleWrapBody() }
+        } label: {
+            Image(systemName: isWrapBody ? "text.alignleft" : "arrow.left.and.right")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(isWrapBody ? LogXTheme.accent : LogXTheme.muted)
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isWrapBody ? LogXTheme.chipOn : LogXTheme.panel2)
+                )
+        }
+        .buttonStyle(LogXPressStyle())
+        .help(isWrapBody ? "Uzun qatorni gorizontal aylanma qilish" : "Matnni oynaga sig'dirish")
+        .accessibilityLabel("Qator o'rash")
+        .accessibilityValue(isWrapBody ? "yoqilgan" : "o'chirilgan")
+    }
+
+    func copyBodyButton(log: NetworkLog) -> some View {
+        Button {
+            copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled, pretty: prettyBody))
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(copied ? "Nusxalandi" : "Nusxa")
+                    .font(LogXType.ui(LogXType.meta, .semibold))
+            }
+            .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.text2)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(LogXTheme.panel2))
+        }
+        .buttonStyle(LogXPressStyle())
+        .keyboardShortcut("c", modifiers: [.option, .command])
+        .help("Tanani nusxalash (⌥⌘C)")
+        .accessibilityLabel("Tanani nusxalash")
+    }
+
+    func segmentButton(_ title: String, active: Bool, help: String, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { action() }
+        } label: {
+            Text(title)
+                .font(LogXType.ui(LogXType.meta, active ? .semibold : .medium))
+                .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10)
+                .frame(height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(active ? LogXTheme.panel : Color.clear)
+                )
+        }
+        .buttonStyle(LogXPressStyle())
+        .help(help)
     }
 
     @ViewBuilder
@@ -72,59 +197,6 @@ extension RequestDetail {
             .buttonStyle(.plain)
             .help("\(item.title) (⌘\(String(tabShortcut(item).character)))")
             .keyboardShortcut(tabShortcut(item), modifiers: .command)
-        }
-    }
-
-    @ViewBuilder
-    func tabToggles(treeAvailable: Bool?) -> some View {
-        if tab == .headers {
-            togglePill(
-                on: headersTableView,
-                icon: headersTableView ? "tablecells" : "doc.plaintext",
-                title: headersTableView ? "Jadval" : "Matn",
-                help: headersTableView ? "Matnli ko'rinishga o'tish" : "Strukturali jadval ko'rinishiga o'tish",
-                label: "Jadval ko'rinishi"
-            ) {
-                headersTableView.toggle()
-            }
-        }
-        if tab == .request || tab == .response {
-            togglePill(
-                on: treeBody,
-                icon: "list.bullet.indent",
-                title: "Daraxt",
-                help: treeBody
-                    ? (treeAvailable == false ? "Tana JSON emas yoki \(JSONTree.nodeLimit) tugundan katta — matn ko'rsatilmoqda; bosilsa daraxt o'chadi" : "Matn ko'rinishiga qaytish")
-                    : "JSON'ni yig'iladigan daraxt sifatida ko'rsatish (⌥-bosish butun shoxni yig'adi)",
-                label: "JSON daraxti"
-            ) {
-                treeBody.toggle()
-            }
-        }
-        if showRawAndWrap(treeAvailable: treeAvailable) {
-            if tab == .request || tab == .response {
-                togglePill(
-                    on: !prettyBody,
-                    icon: "chevron.left.forwardslash.chevron.right",
-                    title: "Raw",
-                    help: prettyBody ? "Serverdan kelgan asl matnni ko'rsatish" : "Formatlangan JSON ko'rsatish",
-                    label: "Asl matn"
-                ) {
-                    prettyBody.toggle()
-                }
-            }
-            togglePill(
-                on: isWrapBody,
-                icon: isWrapBody ? "text.alignleft" : "arrow.left.and.right",
-                title: "O'rash",
-                help: isWrapBody ? "Uzun qatorni gorizontal aylanma qilish" : "Matnni oynaga sig'dirish",
-                label: "Qator o'rash"
-            ) {
-                toggleWrapBody()
-            }
-        }
-        if tab == .request || tab == .response {
-            zoomControls
         }
     }
 
@@ -175,32 +247,6 @@ extension RequestDetail {
             .accessibilityLabel("Kattalashtirish")
         }
         .padding(.leading, 2)
-    }
-
-    func togglePill(on: Bool, icon: String, title: String, help: String, label: String, action: @escaping () -> Void) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                action()
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 10.5, weight: .semibold))
-                Text(title)
-                    .font(LogXType.ui(LogXType.meta, .semibold))
-                    .lineLimit(1)
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .foregroundStyle(on ? LogXTheme.text : LogXTheme.muted)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(on ? LogXTheme.chipOn : Color.clear))
-            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).stroke(on ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel(label)
-        .accessibilityValue(on ? "yoqilgan" : "o'chirilgan")
     }
 
     func tabShortcut(_ item: DetailTab) -> KeyEquivalent {

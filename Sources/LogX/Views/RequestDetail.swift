@@ -14,7 +14,7 @@ struct RequestDetail: View {
     @AppStorage("logx.treeBody") var treeBody = false
     @AppStorage("logx.detailFontSize") var fontSize: Double = 11.5
     @AppStorage("logx.headersTableView") var headersTableView = true
-    @State private var treeMatchCount = 0
+    @State var treeMatchCount = 0
     @StateObject var shareHost = SharePickerHost()
     @State private var bodyCache: RenderedBody?
 
@@ -62,15 +62,18 @@ struct RequestDetail: View {
         let rendered = (bodyCache?.key == key) ? bodyCache : nil
         let params = store.redactEnabled ? Redactor.maskParams(log.queryParams) : log.queryParams
         return VStack(alignment: .leading, spacing: 0) {
-            DetailHeader(log: log, tab: tab)
+            DetailHeader(
+                log: log,
+                tab: tab,
+                onCopyBody: { copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled, pretty: prettyBody)) },
+                onShare: { share(log) }
+            )
             if store.selectedIsHidden {
                 hiddenBanner
             }
             Divider().overlay(LogXTheme.divider)
             tabBar(log: log, treeAvailable: rendered.map { $0.tree != nil })
-            Divider().overlay(LogXTheme.divider)
-            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : (rendered?.matchCount ?? 0))
-            Divider().overlay(LogXTheme.divider)
+            subToolbar(log: log, rendered: rendered, treeAvailable: rendered.map { $0.tree != nil })
             Group {
                 if tab == .headers && headersTableView && findQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ScrollView {
@@ -107,7 +110,6 @@ struct RequestDetail: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            actionBar(log)
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
         }
@@ -211,127 +213,5 @@ struct RequestDetail: View {
         )
         .fixedSize(horizontal: true, vertical: false)
         .help("Yoqilsa ekran, ro'yxat, cURL, eksport va ulashishda token yashiriladi (⌘⇧T)")
-    }
-}
-
-/// Tana matni NSTextView'da: tanlash, o'rash/gorizontal aylanma va faol topilmaga scroll.
-struct BodyTextView: NSViewRepresentable {
-    var text: NSAttributedString
-    var wrap: Bool
-    var activeRange: NSRange?
-    var fontSize: CGFloat = 11.5
-
-    final class Coordinator {
-        var lastText: NSAttributedString?
-        var lastWrap: Bool?
-        var lastActive: NSRange?
-        var lastFontSize: CGFloat?
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.borderType = .noBorder
-
-        let textView = NSTextView()
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.isRichText = false
-        textView.usesFontPanel = false
-        textView.textContainerInset = NSSize(width: 12, height: 14)
-        textView.font = JSONHighlighter.bodyFont(size: fontSize)
-        textView.textColor = JSONHighlighter.nsColor(.plain)
-        textView.isVerticallyResizable = true
-        textView.autoresizingMask = [.width]
-        textView.minSize = NSSize(width: 0, height: 0)
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.setAccessibilityLabel("So'rov tanasi")
-        scroll.documentView = textView
-        return scroll
-    }
-
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
-        guard let textView = scroll.documentView as? NSTextView, let container = textView.textContainer else { return }
-        let coord = context.coordinator
-        if coord.lastFontSize != fontSize {
-            coord.lastFontSize = fontSize
-            textView.font = JSONHighlighter.bodyFont(size: fontSize)
-        }
-        if coord.lastWrap != wrap {
-            coord.lastWrap = wrap
-            if wrap {
-                container.widthTracksTextView = true
-                container.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
-                textView.isHorizontallyResizable = false
-                textView.autoresizingMask = [.width]
-                textView.setFrameSize(NSSize(width: scroll.contentSize.width, height: textView.frame.height))
-                scroll.hasHorizontalScroller = false
-            } else {
-                container.widthTracksTextView = false
-                container.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-                container.lineBreakMode = .byClipping
-                textView.isHorizontallyResizable = true
-                textView.autoresizingMask = []
-                scroll.hasHorizontalScroller = true
-            }
-            textView.layoutManager?.ensureLayout(for: container)
-            textView.sizeToFit()
-        }
-        if coord.lastText !== text {
-            coord.lastText = text
-            textView.textStorage?.setAttributedString(text)
-            coord.lastActive = nil
-            if activeRange == nil {
-                textView.scroll(.zero)
-            }
-        }
-        if let activeRange, coord.lastActive != activeRange, activeRange.location + activeRange.length <= (textView.textStorage?.length ?? 0) {
-            coord.lastActive = activeRange
-            textView.scrollRangeToVisible(activeRange)
-        }
-    }
-}
-
-final class SharePickerHost: NSObject, ObservableObject, NSSharingServicePickerDelegate {
-    weak var view: NSView? {
-        didSet { flushPending() }
-    }
-    private var picker: NSSharingServicePicker?
-    private var pendingURL: URL?
-
-    func present(url: URL) {
-        if show(url: url) { return }
-        pendingURL = url
-        DispatchQueue.main.async { [weak self] in
-            self?.flushPending()
-        }
-    }
-
-    private func flushPending() {
-        guard let pendingURL else { return }
-        if show(url: pendingURL) {
-            self.pendingURL = nil
-        }
-    }
-
-    @discardableResult
-    private func show(url: URL) -> Bool {
-        let attached = view.flatMap { $0.window == nil ? nil : $0 }
-        let anchor = attached ?? NSApp.keyWindow?.contentView
-        guard let anchor, anchor.window != nil else { return false }
-        let picker = NSSharingServicePicker(items: [url])
-        picker.delegate = self
-        self.picker = picker
-        picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
-        return true
-    }
-
-    func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {
-        picker = nil
     }
 }

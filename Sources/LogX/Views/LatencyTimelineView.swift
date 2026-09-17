@@ -1,8 +1,6 @@
 import SwiftUI
 import LogXCore
 
-/// Ro'yxat ustidagi kechikish chizig'i: har ustun — bitta so'rov, balandligi logarifmik.
-/// Sekin so'rovni ro'yxatni varaqlamasdan topish uchun; ustun bosilsa o'sha so'rov tanlanadi.
 struct LatencyTimelineView: View {
     @EnvironmentObject private var store: LogStore
 
@@ -12,9 +10,11 @@ struct LatencyTimelineView: View {
             VStack(alignment: .leading, spacing: 6) {
                 header(count: logs.count)
                 GeometryReader { geo in
+                    let bars = LatencySummary.bars(logs)
+                    let width = barWidth(count: bars.count, available: geo.size.width)
                     HStack(alignment: .bottom, spacing: 2) {
-                        ForEach(LatencySummary.bars(logs)) { bar in
-                            barView(bar, maxHeight: geo.size.height)
+                        ForEach(bars) { bar in
+                            barView(bar, width: width, maxHeight: geo.size.height)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -46,11 +46,17 @@ struct LatencyTimelineView: View {
         }
     }
 
-    private func barView(_ bar: LatencyBar, maxHeight: CGFloat) -> some View {
+    private func barWidth(count: Int, available: CGFloat) -> CGFloat {
+        guard count > 0 else { return 4 }
+        let gaps = CGFloat(max(0, count - 1)) * 2
+        return min(10, max(3, (available - gaps) / CGFloat(count)))
+    }
+
+    private func barView(_ bar: LatencyBar, width: CGFloat, maxHeight: CGFloat) -> some View {
         let selected = store.selectedKey == bar.key
         return RoundedRectangle(cornerRadius: 1, style: .continuous)
             .fill(color(bar, selected: selected))
-            .frame(width: 4, height: max(3, maxHeight * bar.ratio))
+            .frame(width: width, height: max(3, maxHeight * bar.ratio))
             .contentShape(Rectangle())
             .onTapGesture { store.selectKey(bar.key) }
             .help(tooltip(bar))

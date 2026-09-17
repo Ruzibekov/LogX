@@ -15,7 +15,7 @@ final class InspectorSurfaceTests: XCTestCase {
         XCTAssertTrue(filters.contains("lineLimit(1)"), filters)
         XCTAssertTrue(filters.contains("fixedSize"), filters)
         XCTAssertTrue(filters.contains("LogXPressStyle"), filters)
-        XCTAssertTrue(filters.contains("statusSegment"), filters)
+        XCTAssertTrue(filters.contains("statusChip"), filters)
         XCTAssertFalse(filters.contains("shortcutBadge"), filters)
     }
 
@@ -36,7 +36,7 @@ final class InspectorSurfaceTests: XCTestCase {
         XCTAssertTrue(hl.contains("AttributedString()"), hl)
         XCTAssertTrue(hl.contains("120_000"), hl)
         XCTAssertTrue(hl.contains("highlights"), hl)
-        let detail = try source("Sources/LogX/Views/RequestDetail.swift")
+        let detail = try source("Sources/LogX/Views/RequestDetail.swift") + (try source("Sources/LogX/Views/BodyTextView.swift"))
         XCTAssertTrue(detail.contains("BodyTextView"), detail)
         XCTAssertTrue(detail.contains("scrollRangeToVisible"), detail)
         XCTAssertTrue(detail.contains("@AppStorage(\"logx.wrapBody\") private var wrapBody = false"), "long lines scroll horizontally by default")
@@ -47,24 +47,23 @@ final class InspectorSurfaceTests: XCTestCase {
 
     func testSearchPromptFitsToolbar() throws {
         let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
-        XCTAssertTrue(filters.contains("Host, URL, sarlavha, tana (⌘F)"), filters)
+        XCTAssertTrue(filters.contains("Host, URL, sarlavha, tana"), filters)
+        XCTAssertTrue(filters.contains("Text(\"⌘F\")"), filters)
         let content = try source("Sources/LogX/Views/ContentView.swift")
         XCTAssertFalse(content.contains(".searchable("), content)
     }
 
     func testSidebarToggleDoesNotLockLayout() throws {
         let content = try source("Sources/LogX/Views/ContentView.swift")
-        XCTAssertTrue(content.contains("columnVisibility"), content)
-        XCTAssertTrue(content.contains("NavigationSplitViewVisibility"), content)
-        XCTAssertTrue(content.contains(".doubleColumn"), content)
-        XCTAssertTrue(content.contains("navigationSplitViewStyle(.balanced)"), content)
+        XCTAssertTrue(content.contains("HSplitView"), content)
+        XCTAssertTrue(content.contains("minWidth: 380, idealWidth: 460"), content)
+        XCTAssertTrue(content.contains("minWidth: 420, maxWidth: .infinity"), content)
         XCTAssertTrue(content.contains("logx.sidebarVisible"), content)
         XCTAssertFalse(content.contains("max: 920"), content)
         XCTAssertFalse(content.contains("max: 680"), content)
         let rail = try source("Sources/LogX/Views/DeviceRail.swift")
         XCTAssertTrue(rail.contains("maxHeight: .infinity"), rail)
-        XCTAssertTrue(rail.contains("maxHeight: .infinity, alignment: .topLeading)\n\n            Divider()"), rail)
-        XCTAssertFalse(rail.contains("maxHeight: .infinity, alignment: .topLeading)\n\n            Spacer(minLength: 0)"), rail)
+        XCTAssertTrue(rail.contains(".frame(width: Self.width)"), rail)
         let app = try source("Sources/LogX/LogXApp.swift")
         XCTAssertTrue(app.contains("width: 960"), app)
         XCTAssertFalse(app.contains("width: 1100"), app)
@@ -93,6 +92,7 @@ final class InspectorSurfaceTests: XCTestCase {
         XCTAssertTrue(app.contains("NotificationCenter.default.post(name: LogXNotice.focusDetailFind, object: nil)"), app)
         XCTAssertTrue(app.contains("focusListSearch(sender)"), app)
         let findBar = try source("Sources/LogX/Views/DetailFindBar.swift")
-        XCTAssertTrue(findBar.contains("JSON ichida topish (⌘F)"), findBar)
+        XCTAssertTrue(findBar.contains("Tana ichida qidirish"), findBar)
+        XCTAssertTrue(findBar.contains("accessibilityLabel(\"JSON ichida topish\")"), findBar)
     }
 }

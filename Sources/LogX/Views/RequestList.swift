@@ -37,7 +37,6 @@ struct RequestList: View {
             } else {
                 list
             }
-            RequestLiveBar(now: now)
         }
         .background(LogXTheme.bg)
         .background(GeometryReader { geo in Color.clear.preference(key: RequestListWidthKey.self, value: geo.size.width) })
@@ -78,73 +77,55 @@ struct RequestList: View {
         "\(store.selectedAppId)|\(store.selectedSerial ?? "")"
     }
 
-    private func headerButton(_ title: String, field: LogSortField) -> some View {
-        let active = store.sortField == field
-        return Button {
-            store.toggleSort(field)
-        } label: {
-            HStack(spacing: 3) {
-                Text(title)
-                    .font(LogXType.ui(LogXType.caption, active ? .semibold : .medium))
-                if active {
-                    Image(systemName: store.sortOrder == .ascending ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 7.5, weight: .bold))
-                }
-            }
-            .foregroundStyle(active ? LogXTheme.accentLight : LogXTheme.muted)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(active ? LogXTheme.chipOn : Color.clear, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .help("\(title) bo'yicha saralash")
-    }
-
-    private var columnHeader: some View {
-        HStack(spacing: 6) {
-            Text("SARALASH")
-                .font(LogXType.ui(LogXType.caption, .semibold))
-                .tracking(0.6)
-                .foregroundStyle(LogXTheme.muted2)
-            headerButton("Metod", field: .method)
-            headerButton("Kod", field: .status)
-            headerButton("Manzil", field: .path)
-            headerButton("Davom", field: .duration)
-            if showTimeColumn {
-                headerButton("Vaqt", field: .time)
-            }
-            Spacer(minLength: 0)
-            if showAppColumn {
-                Text("ILOVA")
-                    .font(LogXType.ui(LogXType.caption, .semibold))
-                    .tracking(0.6)
+    private func hostHeader(_ host: String, count: Int) -> some View {
+        Button { store.selectHost(host) } label: {
+            HStack(spacing: 10) {
+                Text(host)
+                    .font(LogXType.mono(LogXType.caption, .semibold))
+                    .foregroundStyle(store.selectedHost == host ? LogXTheme.accent : LogXTheme.muted)
+                    .lineLimit(1)
+                Rectangle()
+                    .fill(LogXTheme.divider)
+                    .frame(height: 1)
+                Text("\(count)")
+                    .font(LogXType.mono(LogXType.caption))
                     .foregroundStyle(LogXTheme.muted2)
             }
+            .padding(.horizontal, 14)
+            .frame(height: 26)
+            .background(LogXTheme.bg)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(LogXTheme.well)
+        .buttonStyle(.plain)
+        .help(store.selectedHost == host ? "Host filtrini olib tashlash" : "Faqat \(host)")
     }
 
     private var list: some View {
         VStack(spacing: 0) {
             LatencyTimelineView()
-            columnHeader
-            Divider().overlay(LogXTheme.divider)
             ScrollViewReader { proxy in
-                List(store.visibleLogs) { log in
-                    RequestRow(
-                        log: log,
-                        selected: store.selectedKey == log.key,
-                        now: now,
-                        showAppColumn: showAppColumn,
-                        showTimeColumn: showTimeColumn
-                    )
-                        .id(log.key)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                        .contextMenu { rowMenu(log) }
+                List(ListGrouping.rows(store.visibleLogs)) { row in
+                    switch row {
+                    case let .host(name, count):
+                        hostHeader(name, count: count)
+                            .id(row.id)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    case let .log(log):
+                        RequestRow(
+                            log: log,
+                            selected: store.selectedKey == log.key,
+                            now: now,
+                            showAppColumn: showAppColumn,
+                            showTimeColumn: showTimeColumn
+                        )
+                            .id(log.key)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                            .contextMenu { rowMenu(log) }
+                    }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)

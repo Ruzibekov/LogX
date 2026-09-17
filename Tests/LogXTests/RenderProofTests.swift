@@ -23,6 +23,8 @@ final class RenderProofTests: XCTestCase {
         for log in logs { s.liveByKey[log.key] = log }
         s.rebuildFromLive()
         s.selectedKey = logs.first?.key
+        s.connection = .live
+        s.isLoading = false
         return s
     }
 
@@ -105,6 +107,53 @@ final class RenderProofTests: XCTestCase {
             RequestEmptyView().environmentObject(s).background(LogXTheme.bg),
             size: CGSize(width: 560, height: 420),
             name: "render-empty"
+        )
+    }
+
+    func testFilterBarRenders() throws {
+        let s = store(sample())
+        try render(
+            RequestFilterBar().environmentObject(s),
+            size: CGSize(width: 560, height: 90),
+            name: "render-filterbar"
+        )
+    }
+
+    func testDeviceRailRenders() throws {
+        let s = store(sample())
+        try render(
+            DeviceRail().environmentObject(s),
+            size: CGSize(width: DeviceRail.width, height: 420),
+            name: "render-rail"
+        )
+    }
+
+    func testLiveBarRenders() throws {
+        let s = store(sample())
+        try render(
+            RequestLiveBar(now: Date()).environmentObject(s),
+            size: CGSize(width: 900, height: 34),
+            name: "render-livebar"
+        )
+    }
+
+    func testRequestListRenders() throws {
+        let s = store(sample())
+        try render(
+            RequestList().environmentObject(s),
+            size: CGSize(width: 460, height: 520),
+            name: "render-list"
+        )
+    }
+
+    func testRequestDetailRenders() throws {
+        let logs = sample()
+        let s = store(logs)
+        s.selectedKey = logs[1].key
+        try render(
+            RequestDetail().environmentObject(s),
+            size: CGSize(width: 760, height: 560),
+            name: "render-detail"
         )
     }
 }

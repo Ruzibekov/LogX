@@ -37,12 +37,22 @@ struct RenderedBody {
     var activeRange: NSRange?
     var truncationNotice: String?
     var tree: JSONTree?
+    var lineCount: Int = 0
 
     static func make(log: NetworkLog, key: Key) -> RenderedBody {
         if key.tree, key.tab == .request || key.tab == .response {
             let source = JSONFormat.body(for: log, tab: key.tab, redact: key.redact, pretty: true)
             if let tree = JSONTree(text: source, identity: "\(log.key)|\(key.tab.rawValue)|\(key.redact)") {
-                return RenderedBody(key: key, text: source, attributed: NSAttributedString(), matchCount: 0, activeRange: nil, truncationNotice: nil, tree: tree)
+                return RenderedBody(
+                    key: key,
+                    text: source,
+                    attributed: NSAttributedString(),
+                    matchCount: 0,
+                    activeRange: nil,
+                    truncationNotice: nil,
+                    tree: tree,
+                    lineCount: source.reduce(into: 1) { acc, ch in if ch == "\n" { acc += 1 } }
+                )
             }
         }
         let body = JSONFormat.body(for: log, tab: key.tab, redact: key.redact, pretty: key.pretty)
@@ -69,7 +79,8 @@ struct RenderedBody {
             attributed: rendered.text,
             matchCount: matches.count,
             activeRange: rendered.activeRange,
-            truncationNotice: notice
+            truncationNotice: notice,
+            lineCount: display.reduce(into: 1) { acc, ch in if ch == "\n" { acc += 1 } }
         )
     }
 }

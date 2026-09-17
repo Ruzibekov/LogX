@@ -61,7 +61,8 @@ final class ResponsiveLayoutTests: XCTestCase {
 
     func testDetailHeaderStructureSeparatesHeaderAndMetadata() throws {
         let src = try source("Sources/LogX/Views/DetailHeader.swift")
-        XCTAssertTrue(src.contains("HeaderIconButton"), src)
+        XCTAssertTrue(src.contains("actionPill"), src)
+        XCTAssertTrue(src.contains("metaLine"), src)
         XCTAssertTrue(src.contains("isCollapsed"), src)
         XCTAssertTrue(src.contains("WrapLayout"), src)
         XCTAssertTrue(src.contains("problemMessage"), src)
