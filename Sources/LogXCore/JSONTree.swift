@@ -49,6 +49,7 @@ public struct JSONTree: @unchecked Sendable {
     public init?(text: String, identity: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{") || trimmed.hasPrefix("["),
+              JSONTree.fitsNodeLimit(trimmed),
               let data = trimmed.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data, options: []),
               (obj is [String: Any]) || (obj is [Any]) else { return nil }
@@ -59,6 +60,26 @@ public struct JSONTree: @unchecked Sendable {
         root = obj
         containerIDs = Set(out.filter { $0.kind.isContainer && $0.childCount > 0 }.map(\.id))
         self.identity = identity
+    }
+
+    static func fitsNodeLimit(_ text: String, limit: Int = JSONTree.nodeLimit) -> Bool {
+        var nodes = 0
+        var inString = false
+        var escaped = false
+        for byte in text.utf8 {
+            if escaped { escaped = false; continue }
+            if inString {
+                if byte == 0x5C { escaped = true } else if byte == 0x22 { inString = false }
+                continue
+            }
+            switch byte {
+            case 0x22: inString = true
+            case 0x2C, 0x7B, 0x5B: nodes += 1
+            default: break
+            }
+            if nodes > limit { return false }
+        }
+        return true
     }
 
     private static func walk(_ value: Any, key: String, depth: Int, components: [JSONNode.PathComponent], into out: inout [JSONNode]) -> Bool {

@@ -150,10 +150,13 @@ extension LogStore {
     func ingestBatch(_ items: [NetworkLog]) {
         guard !items.isEmpty else { return }
         if isPaused {
-            pendingWhilePaused.append(contentsOf: items.filter { !clearedKeys.contains($0.key) })
+            for item in items where !clearedKeys.contains(item.key) {
+                pendingWhilePaused.append(BodyBudget.clamp(item))
+            }
             if pendingWhilePaused.count > maxLogCapacity {
                 pendingWhilePaused.removeFirst(pendingWhilePaused.count - maxLogCapacity)
             }
+            enforcePausedBudget()
             return
         }
         var fresh: [NetworkLog] = []
@@ -164,14 +167,12 @@ extension LogStore {
             if let existing = liveByKey[item.key] {
                 if item.ts == nil || (existing.ts ?? 0) > 0 { item.ts = existing.ts }
                 if existing != item {
-                    bodyBytesEstimate += BodyBudget.bytes(item) - BodyBudget.bytes(existing)
-                    liveByKey[item.key] = item
+                    upsertLive(item)
                     queryMatchCache.removeValue(forKey: item.key)
                     updated = true
                 }
             } else {
-                bodyBytesEstimate += BodyBudget.bytes(item)
-                liveByKey[item.key] = item
+                upsertLive(item)
                 fresh.append(item)
             }
         }

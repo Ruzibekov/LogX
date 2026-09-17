@@ -106,7 +106,7 @@ extension LogStore {
     }
 
     func insertReplay(_ log: NetworkLog) {
-        liveByKey[log.key] = log
+        upsertLive(log)
         if let ts = log.ts { lastActivityTs = max(lastActivityTs ?? 0, ts) }
         rebuildFromLive()
         reconcileSelection()

@@ -68,17 +68,25 @@ enum JSONHighlighter {
         } else {
             spans = JSONFormat.highlight(text)
         }
-        let result = NSMutableAttributedString()
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 2
         let font = bodyFont(size: fontSize)
+        let plain = spans.reduce(into: "") { $0 += $1.text }
+        let result = NSMutableAttributedString(string: plain, attributes: [
+            .font: font,
+            .foregroundColor: nsColor(.plain),
+            .paragraphStyle: paragraph,
+        ])
+        result.beginEditing()
+        var cursor = 0
         for span in spans {
-            result.append(NSAttributedString(string: span.text, attributes: [
-                .font: font,
-                .foregroundColor: nsColor(span.kind),
-                .paragraphStyle: paragraph,
-            ]))
+            let length = (span.text as NSString).length
+            if span.kind != .plain {
+                result.addAttribute(.foregroundColor, value: nsColor(span.kind), range: NSRange(location: cursor, length: length))
+            }
+            cursor += length
         }
+        result.endEditing()
         var active: NSRange?
         if !highlights.isEmpty {
             let warnBg = LogXTheme.dynamicNS(dark: 0xE0A23C, light: 0xA96B0C).withAlphaComponent(0.42)

@@ -32,7 +32,12 @@ public enum BodyBudget: Sendable {
 
     /// Bitta logning tanalari egallagan bayt.
     public static func bytes(_ log: NetworkLog) -> Int {
-        (log.requestBody?.utf8.count ?? 0) + (log.responseBody?.utf8.count ?? 0)
+        payloadBytes(log.requestBody) + payloadBytes(log.responseBody)
+    }
+
+    private static func payloadBytes(_ body: String?) -> Int {
+        guard let body, body != droppedNotice else { return 0 }
+        return body.utf8.count
     }
 
     public static func isDropped(_ body: String?) -> Bool {
@@ -69,5 +74,28 @@ public enum BodyBudget: Sendable {
         if out.requestBody != nil { out.requestBody = droppedNotice }
         if out.responseBody != nil { out.responseBody = droppedNotice }
         return out
+    }
+}
+
+extension BodyBudget {
+    public static let secondaryBodyBytes = 8 * 1024 * 1024
+
+    public static func enforce(newestFirst logs: [NetworkLog], budget: Int = secondaryBodyBytes) -> [NetworkLog] {
+        var used = 0
+        var out = logs
+        for index in out.indices {
+            let size = bytes(out[index])
+            if size == 0 { continue }
+            if used + size <= budget {
+                used += size
+            } else {
+                out[index] = dropBodies(out[index])
+            }
+        }
+        return out
+    }
+
+    public static func totalBytes(_ logs: some Sequence<NetworkLog>) -> Int {
+        logs.reduce(0) { $0 + bytes($1) }
     }
 }

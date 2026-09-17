@@ -219,6 +219,19 @@ final class LogStore: ObservableObject {
         selectedIsHidden = !cachedVisibleKeys.contains(log.key)
     }
 
+    func upsertLive(_ log: NetworkLog) {
+        let clamped = BodyBudget.clamp(log)
+        let previous = liveByKey[clamped.key].map(BodyBudget.bytes) ?? 0
+        bodyBytesEstimate += BodyBudget.bytes(clamped) - previous
+        liveByKey[clamped.key] = clamped
+    }
+
+    func enforcePausedBudget() {
+        let newestFirst = Array(pendingWhilePaused.reversed())
+        guard BodyBudget.totalBytes(newestFirst) > BodyBudget.secondaryBodyBytes else { return }
+        pendingWhilePaused = Array(BodyBudget.enforce(newestFirst: newestFirst).reversed())
+    }
+
     func enforceBodyBudget() {
         guard bodyBytesEstimate > BodyBudget.totalBodyBytes else { return }
         let sizes = liveByKey.values

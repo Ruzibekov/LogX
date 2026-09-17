@@ -28,6 +28,7 @@ extension LogStore {
         guard !liveByKey.isEmpty || !pendingWhilePaused.isEmpty else { return }
         clearedSnapshot.merge(liveByKey) { _, new in new }
         for item in pendingWhilePaused { clearedSnapshot[item.key] = item }
+        enforceSnapshotBudget()
         if clearedKeys.count > maxLogCapacity * 2 { clearedKeys.removeAll() }
         clearedKeys.formUnion(liveByKey.keys)
         clearedKeys.formUnion(pendingWhilePaused.map(\.key))
@@ -44,10 +45,24 @@ extension LogStore {
 
     var canUndoClear: Bool { !clearedSnapshot.isEmpty }
 
+    func enforceSnapshotBudget() {
+        if clearedSnapshot.count > maxLogCapacity {
+            let extra = clearedSnapshot
+                .sorted { ($0.value.ts ?? 0) < ($1.value.ts ?? 0) }
+                .prefix(clearedSnapshot.count - maxLogCapacity)
+            for entry in extra { clearedSnapshot.removeValue(forKey: entry.key) }
+        }
+        guard BodyBudget.totalBytes(clearedSnapshot.values) > BodyBudget.secondaryBodyBytes else { return }
+        let newestFirst = clearedSnapshot.values.sorted { ($0.ts ?? 0) > ($1.ts ?? 0) }
+        for log in BodyBudget.enforce(newestFirst: newestFirst) {
+            clearedSnapshot[log.key] = log
+        }
+    }
+
     func undoClear() {
         guard canUndoClear else { return }
         for (key, log) in clearedSnapshot where liveByKey[key] == nil {
-            liveByKey[key] = log
+            upsertLive(log)
         }
         clearedSnapshot = [:]
         clearedKeys = []
