@@ -1,18 +1,24 @@
 import AppKit
 
-final class LineNumberRuler: NSRulerView {
+final class LineNumberGutter: NSView {
+    private weak var textView: NSTextView?
+    private weak var scroll: NSScrollView?
     private var fontSize: CGFloat
 
-    init(textView: NSTextView, fontSize: CGFloat) {
+    static let width: CGFloat = 46
+
+    init(textView: NSTextView, scroll: NSScrollView, fontSize: CGFloat) {
+        self.textView = textView
+        self.scroll = scroll
         self.fontSize = fontSize
-        super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
-        clientView = textView
-        ruleThickness = 46
+        super.init(frame: .zero)
     }
 
-    required init(coder: NSCoder) {
+    required init?(coder: NSCoder) {
         fatalError("init(coder:) ishlatilmaydi")
     }
+
+    override var isFlipped: Bool { true }
 
     func apply(fontSize: CGFloat) {
         guard self.fontSize != fontSize else { return }
@@ -20,20 +26,21 @@ final class LineNumberRuler: NSRulerView {
         needsDisplay = true
     }
 
-    override func drawHashMarksAndLabels(in rect: NSRect) {
+    override func draw(_ dirtyRect: NSRect) {
         LogXTheme.dynamicNS(dark: 0x0A0C0F, light: 0xF2F5F9).setFill()
-        rect.fill()
+        bounds.fill()
         LogXTheme.dynamicNS(dark: 0x1B1F25, light: 0xE7EBF0).setFill()
-        NSRect(x: bounds.maxX - 1, y: rect.minY, width: 1, height: rect.height).fill()
+        NSRect(x: bounds.maxX - 1, y: 0, width: 1, height: bounds.height).fill()
 
-        guard let textView = clientView as? NSTextView,
+        guard let textView,
               let layoutManager = textView.layoutManager,
-              let container = textView.textContainer else { return }
+              let container = textView.textContainer,
+              let scroll else { return }
 
         let content = textView.string as NSString
         guard content.length > 0 else { return }
 
-        let visible = scrollView?.contentView.bounds ?? .zero
+        let visible = scroll.contentView.bounds
         let glyphRange = layoutManager.glyphRange(forBoundingRect: visible, in: container)
         let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
 
@@ -66,5 +73,30 @@ final class LineNumberRuler: NSRulerView {
             index = NSMaxRange(lineRange)
             if lineRange.length == 0 { break }
         }
+    }
+}
+
+final class BodyContainerView: NSView {
+    let gutter: LineNumberGutter
+    let scroll: NSScrollView
+
+    init(scroll: NSScrollView, gutter: LineNumberGutter) {
+        self.scroll = scroll
+        self.gutter = gutter
+        super.init(frame: .zero)
+        addSubview(gutter)
+        addSubview(scroll)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) ishlatilmaydi")
+    }
+
+    override func layout() {
+        super.layout()
+        let width = LineNumberGutter.width
+        gutter.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
+        scroll.frame = NSRect(x: width, y: 0, width: max(0, bounds.width - width), height: bounds.height)
+        gutter.needsDisplay = true
     }
 }

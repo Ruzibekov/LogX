@@ -156,4 +156,43 @@ final class RenderProofTests: XCTestCase {
             name: "render-detail"
         )
     }
+
+    func testContentViewRenders() throws {
+        let logs = sample()
+        let s = store(logs)
+        s.selectedKey = logs[1].key
+        try render(
+            ContentView().environmentObject(s),
+            size: CGSize(width: 1440, height: 900),
+            name: "render-contentview"
+        )
+    }
+
+    func testDetailWithBodyKeepsHeaderVisible() throws {
+        let logs = sample()
+        let s = store(logs)
+        s.selectedKey = logs[1].key
+        let size = CGSize(width: 760, height: 560)
+        let host = NSHostingView(rootView: RequestDetail().environmentObject(s).frame(width: size.width, height: size.height))
+        host.frame = CGRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(1.0))
+        host.layoutSubtreeIfNeeded()
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+            return XCTFail("bitmap yaratilmadi")
+        }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        if let png = rep.representation(using: .png, properties: [:]) {
+            let dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".screenshots")
+            try? png.write(to: dir.appendingPathComponent("render-detail-body.png"))
+        }
+        var found = false
+        for y in 0..<40 where !found {
+            for x in stride(from: 0, to: Int(size.width), by: 4) {
+                guard let color = rep.colorAt(x: x, y: y) else { continue }
+                if color.brightnessComponent > 0.3 { found = true; break }
+            }
+        }
+        XCTAssertTrue(found, "inspektor sarlavhasi ko'rinmayapti — tana ko'rinishi uni surib yuborgan")
+    }
 }

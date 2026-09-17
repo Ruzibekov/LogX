@@ -16,14 +16,14 @@ struct BodyTextView: NSViewRepresentable {
         var lastFontSize: CGFloat?
         private var observer: NSObjectProtocol?
 
-        func observe(scroll: NSScrollView, ruler: LineNumberRuler) {
+        func observe(scroll: NSScrollView, gutter: LineNumberGutter) {
             if let observer { NotificationCenter.default.removeObserver(observer) }
             observer = NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification,
                 object: scroll.contentView,
                 queue: .main
-            ) { [weak ruler] _ in
-                ruler?.needsDisplay = true
+            ) { [weak gutter] _ in
+                gutter?.needsDisplay = true
             }
         }
 
@@ -34,7 +34,7 @@ struct BodyTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    func makeNSView(context: Context) -> BodyContainerView {
         let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
@@ -57,22 +57,27 @@ struct BodyTextView: NSViewRepresentable {
         textView.setAccessibilityLabel("So'rov tanasi")
         scroll.documentView = textView
 
-        let ruler = LineNumberRuler(textView: textView, fontSize: fontSize)
-        scroll.verticalRulerView = ruler
-        scroll.hasVerticalRuler = true
-        scroll.rulersVisible = true
         scroll.contentView.postsBoundsChangedNotifications = true
-        context.coordinator.observe(scroll: scroll, ruler: ruler)
-        return scroll
+
+        let gutter = LineNumberGutter(textView: textView, scroll: scroll, fontSize: fontSize)
+        context.coordinator.observe(scroll: scroll, gutter: gutter)
+        return BodyContainerView(scroll: scroll, gutter: gutter)
     }
 
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: BodyContainerView, context: Context) -> CGSize? {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 320
+        let height = proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? 240
+        return CGSize(width: width, height: height)
+    }
+
+    func updateNSView(_ nsView: BodyContainerView, context: Context) {
+        let scroll = nsView.scroll
         guard let textView = scroll.documentView as? NSTextView, let container = textView.textContainer else { return }
         let coord = context.coordinator
         if coord.lastFontSize != fontSize {
             coord.lastFontSize = fontSize
             textView.font = JSONHighlighter.bodyFont(size: fontSize)
-            (scroll.verticalRulerView as? LineNumberRuler)?.apply(fontSize: fontSize)
+            nsView.gutter.apply(fontSize: fontSize)
         }
         if coord.lastWrap != wrap {
             coord.lastWrap = wrap
@@ -97,7 +102,7 @@ struct BodyTextView: NSViewRepresentable {
         if coord.lastText !== text {
             coord.lastText = text
             textView.textStorage?.setAttributedString(text)
-            scroll.verticalRulerView?.needsDisplay = true
+            nsView.gutter.needsDisplay = true
             coord.lastActive = nil
             if activeRange == nil {
                 textView.scroll(.zero)
