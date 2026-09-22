@@ -19,7 +19,10 @@ final class LogStore: ObservableObject {
     @Published var selectedKey: String?
     @Published var detailTab: DetailTab = .response
     @Published var serverOK = false
-    @Published var banner: String?
+    @Published private(set) var banner: String?
+    /// Banner oqim haqida (`event: error`) — refresh muvaffaqiyatida o'chirilmaydi,
+    /// faqat yangi log kelganda yoki server tushganda almashadi.
+    @Published private(set) var bannerIsStreamNotice = false
     @Published var isLoading = true
     @Published var isPaused = false
     @Published var selectedMethod: String = "ALL"
@@ -112,6 +115,13 @@ final class LogStore: ObservableObject {
         persistPrefs()
     }
 
+    /// Bannerning yagona yozish nuqtasi — matn va «oqim haqida» belgisi birga
+    /// o'zgaradi, matn prefiksiga qarab taxmin qilinmaydi.
+    func setBanner(_ text: String?, stream: Bool = false) {
+        banner = text
+        bannerIsStreamNotice = text == nil ? false : stream
+    }
+
     func start() async {
         startGeneration += 1
         let gen = startGeneration
@@ -122,13 +132,13 @@ final class LogStore: ObservableObject {
         serverOK = await client.ensureServer(projectRoot: MonitorClient.projectRoot())
         guard gen == startGeneration, !Task.isCancelled else { return }
         if !serverOK {
-            banner = "8787 ochilmadi — bash tools/rsid-http-monitor/service.sh start"
+            setBanner("8787 ochilmadi — bash tools/rsid-http-monitor/service.sh start")
             isLoading = false
             publishConnection()
             pollTask = Task { await pollLoop() }
             return
         }
-        banner = nil
+        setBanner(nil)
         await refresh(full: true)
         guard gen == startGeneration, !Task.isCancelled else { return }
         isLoading = false
@@ -175,7 +185,7 @@ final class LogStore: ObservableObject {
 
             syncLiveStreams()
             reconcileSelection()
-            if banner != nil, !bannerIsStreamNotice { banner = nil }
+            if banner != nil, !bannerIsStreamNotice { setBanner(nil) }
             publishConnection()
         } catch {
             refreshFailures += 1

@@ -108,7 +108,7 @@ final class ReviewRegressionStoreTests: XCTestCase {
         let store = makeStore()
         store.client = MonitorClient(baseURL: URL(string: "http://127.0.0.1:9/")!)
         store.serverOK = true
-        store.banner = "Stream: pid map failed"
+        store.setBanner("pid map failed", stream: true)
         await store.refresh()
         XCTAssertTrue(store.serverOK, "one failed poll is not an outage")
         XCTAssertEqual(store.refreshFailures, 1)
@@ -134,7 +134,7 @@ final class ReviewRegressionStoreTests: XCTestCase {
     func testStreamErrorBannerClearsWhenLogsFlowAgain() {
         let store = makeStore()
         store.handleStreamChunk(serial: "S", chunk: .serverError("pid map failed"))
-        XCTAssertEqual(store.banner, "Stream: pid map failed")
+        XCTAssertEqual(store.banner, "Ilova xaritasi yangilanmadi — loglar «Noma'lum» ko'rinishi mumkin")
         XCTAssertTrue(store.bannerIsStreamNotice)
         store.handleStreamChunk(serial: "S", chunk: .logs([log("a", ts: 1)]))
         XCTAssertNil(store.banner)

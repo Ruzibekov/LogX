@@ -26,13 +26,10 @@ extension LogStore {
         streamHealthBySerial.removeAll()
     }
 
-    /// Stream haqidagi banner (`event: error`) refresh muvaffaqiyatida o'chirilmaydi.
-    var bannerIsStreamNotice: Bool { banner?.hasPrefix("Stream: ") == true }
-
     func markServerDown(_ error: Error) {
         let wasUp = serverOK
         serverOK = false
-        banner = (error as? MonitorClientError)?.description ?? String(describing: error)
+        setBanner((error as? MonitorClientError)?.description ?? String(describing: error))
         if wasUp {
             LogXLog.write("server down: \(banner ?? "")")
             dropLiveStreams()
@@ -110,12 +107,13 @@ extension LogStore {
         case .opened:
             setHealth(serial, .live)
         case .logs(let items):
-            if bannerIsStreamNotice { banner = nil }
+            if bannerIsStreamNotice { setBanner(nil) }
             ingestBatch(items)
             noteUnknownApps(serial: serial, items: items)
         case .serverError(let message):
-            banner = "Stream: \(message)"
             LogXLog.write("stream error serial=\(serial) \(message)")
+            guard let notice = StreamNoticeParser.notice(for: message) else { return }
+            setBanner(notice.text, stream: true)
         }
     }
 
@@ -204,7 +202,7 @@ extension LogStore {
                 if Task.isCancelled { break }
                 if ok {
                     serverOK = true
-                    banner = nil
+                    setBanner(nil)
                     await refresh(full: true)
                     syncLiveStreams()
                 }

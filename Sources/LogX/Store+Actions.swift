@@ -111,7 +111,7 @@ extension LogStore {
     }
 
     func dismissBanner() {
-        banner = nil
+        setBanner(nil)
     }
 
     /// ⌘E / ⇧⌘E: ko'rinadigan ro'yxatda keyingi yoki oldingi xatoga o'tadi (4xx/5xx/NET).

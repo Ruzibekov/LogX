@@ -137,6 +137,21 @@ final class RenderProofTests: XCTestCase {
         )
     }
 
+    /// Oqim uzilganda bannerda xom ingliz `logcat` matni emas, bitta qatorli
+    /// tushunarli xabar turishi kerak — ro'yxat ustida chizib tekshiriladi.
+    func testStreamNoticeStripRenders() throws {
+        let s = store(sample())
+        let raw = #"{"message":"logcat: Unexpected EOF!\n\nThis means that either the device shut down, logd crashed, or this instance of logcat was unable to read log\nmessages as quickly as they were being produced."}"#
+        s.handleStreamChunk(serial: "S", chunk: .serverError(raw))
+        XCTAssertEqual(s.banner, "Log oqimi uzildi (bufer to'lib ketdi) — qayta ulanyapti")
+        XCTAssertTrue(s.bannerIsStreamNotice)
+        try render(
+            RequestList().environmentObject(s),
+            size: CGSize(width: 560, height: 420),
+            name: "render-stream-notice"
+        )
+    }
+
     func testRequestListRenders() throws {
         let s = store(sample())
         try render(
