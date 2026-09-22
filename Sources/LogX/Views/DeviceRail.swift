@@ -11,7 +11,7 @@ struct DeviceRail: View {
             deviceAvatar(
                 label: "ALL",
                 title: "Barcha qurilmalar",
-                subtitle: store.allLogs.isEmpty ? "jonli so'rov yo'q" : "\(store.allLogs.count) ta jonli",
+                subtitle: store.logCount == 0 ? "jonli so'rov yo'q" : "\(store.logCount) ta jonli",
                 online: store.hasLiveStream,
                 selected: store.selectedSerial == nil
             ) {
@@ -100,9 +100,9 @@ struct DeviceRail: View {
                 setScope { store.selectApp("all") }
             } label: {
                 if store.selectedAppId == "all" {
-                    Label("Barcha ilovalar · \(store.allLogs.count)", systemImage: "checkmark")
+                    Label("Barcha ilovalar · \(store.logCount)", systemImage: "checkmark")
                 } else {
-                    Text("Barcha ilovalar · \(store.allLogs.count)")
+                    Text("Barcha ilovalar · \(store.logCount)")
                 }
             }
             if !store.liveApps.isEmpty { Divider() }

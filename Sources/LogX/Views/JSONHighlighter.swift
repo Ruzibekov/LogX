@@ -59,32 +59,35 @@ enum JSONHighlighter {
         activeIndex: Int? = nil,
         fontSize: CGFloat = 11.5
     ) -> (text: NSAttributedString, activeRange: NSRange?) {
-        let spans: [JSONSpan]
+        let runs: [JSONRun]
         if headers {
-            spans = JSONFormat.highlightHeaders(text)
-        } else if text.count > 120_000 {
-            let prefixIndex = text.index(text.startIndex, offsetBy: 100_000)
-            spans = JSONFormat.highlight(String(text[..<prefixIndex])) + [JSONSpan(String(text[prefixIndex...]), .plain)]
+            runs = JSONFormat.highlightHeaderRuns(text)
+        } else if text.utf16.count > 120_000 {
+            let cut = text.utf16.index(text.utf16.startIndex, offsetBy: 100_000)
+            if let cutIndex = cut.samePosition(in: text) {
+                let head = JSONFormat.highlightRuns(String(text[..<cutIndex]))
+                let tailLength = text[cutIndex...].utf16.count
+                runs = head + (tailLength > 0 ? [JSONRun(length: tailLength, kind: .plain)] : [])
+            } else {
+                runs = [JSONRun(length: text.utf16.count, kind: .plain)]
+            }
         } else {
-            spans = JSONFormat.highlight(text)
+            runs = JSONFormat.highlightRuns(text)
         }
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 2
-        let font = bodyFont(size: fontSize)
-        let plain = spans.reduce(into: "") { $0 += $1.text }
-        let result = NSMutableAttributedString(string: plain, attributes: [
-            .font: font,
+        let result = NSMutableAttributedString(string: text, attributes: [
+            .font: bodyFont(size: fontSize),
             .foregroundColor: nsColor(.plain),
             .paragraphStyle: paragraph,
         ])
         result.beginEditing()
         var cursor = 0
-        for span in spans {
-            let length = (span.text as NSString).length
-            if span.kind != .plain {
-                result.addAttribute(.foregroundColor, value: nsColor(span.kind), range: NSRange(location: cursor, length: length))
+        for run in runs {
+            if run.kind != .plain, cursor + run.length <= result.length {
+                result.addAttribute(.foregroundColor, value: nsColor(run.kind), range: NSRange(location: cursor, length: run.length))
             }
-            cursor += length
+            cursor += run.length
         }
         result.endEditing()
         var active: NSRange?

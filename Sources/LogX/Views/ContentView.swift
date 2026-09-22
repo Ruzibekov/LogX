@@ -98,7 +98,7 @@ struct ContentView: View {
                     Button(store.hideNoise ? "Shovqinni ko'rsatish" : "Shovqinni yashirish") { store.toggleHideNoise() }
                     Divider()
                     Button("Ro'yxatni tozalash") { store.clearLogs() }
-                        .disabled(store.allLogs.isEmpty)
+                        .disabled(store.logCount == 0)
                     Button("Tozalashni bekor qilish") { store.undoClear() }
                         .disabled(!store.canUndoClear)
                 } label: {

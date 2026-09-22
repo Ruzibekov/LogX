@@ -1,13 +1,9 @@
 import Foundation
 
 /// So'rov tanalari RAM ning asosiy iste'molchisi: 2500 ta log × bir necha yuz KB
-/// osonlik bilan gigabaytga chiqadi. Shuning uchun tana kirishda chegaralanadi va
-/// umumiy byudjetdan oshganda eng eski loglarning tanasi tashlanadi — metama qoladi.
 public enum BodyBudget: Sendable {
-    /// Bitta tana uchun yuqori chegara.
     public static let maxBodyBytes = 512 * 1024
-    /// Barcha saqlanadigan tanalar uchun byudjet.
-    public static let totalBodyBytes = 32 * 1024 * 1024
+    public static let totalBodyBytes = 8 * 1024 * 1024
 
     public static let truncatedNotice = "\n… LogX: tana chegaradan katta, qolgani kesildi"
     public static let droppedNotice = "… LogX: xotira byudjeti — eski so'rov tanasi tashlandi"
@@ -25,23 +21,29 @@ public enum BodyBudget: Sendable {
 
     public static func clamp(_ log: NetworkLog, limit: Int = maxBodyBytes) -> NetworkLog {
         var out = log
-        out.requestBody = clamp(log.requestBody, limit: limit)
-        out.responseBody = clamp(log.responseBody, limit: limit)
+        if out.requestBodyPacked.byteCount > limit {
+            out.requestBody = clamp(out.requestBody, limit: limit)
+        }
+        if out.responseBodyPacked.byteCount > limit {
+            out.responseBody = clamp(out.responseBody, limit: limit)
+        }
         return out
     }
 
-    /// Bitta logning tanalari egallagan bayt.
     public static func bytes(_ log: NetworkLog) -> Int {
-        payloadBytes(log.requestBody) + payloadBytes(log.responseBody)
+        payloadBytes(log.requestBodyPacked) + payloadBytes(log.responseBodyPacked)
     }
 
-    private static func payloadBytes(_ body: String?) -> Int {
-        guard let body, body != droppedNotice else { return 0 }
-        return body.utf8.count
+    private static func payloadBytes(_ packed: PackedText) -> Int {
+        isDropped(packed) ? 0 : packed.storedBytes
     }
 
     public static func isDropped(_ body: String?) -> Bool {
         body == droppedNotice
+    }
+
+    public static func isDropped(_ packed: PackedText) -> Bool {
+        packed.byteCount == droppedNotice.utf8.count && packed.text == droppedNotice
     }
 
     /// Tanasi tashlanadigan kalitlar. `sizes` yangidan eskiga tartiblangan bo'lishi kerak:
@@ -71,14 +73,14 @@ public enum BodyBudget: Sendable {
     /// Tanani belgili matn bilan almashtiradi — foydalanuvchi nima uchun yo'qligini ko'radi.
     public static func dropBodies(_ log: NetworkLog) -> NetworkLog {
         var out = log
-        if out.requestBody != nil { out.requestBody = droppedNotice }
-        if out.responseBody != nil { out.responseBody = droppedNotice }
+        if !out.requestBodyPacked.isEmpty { out.requestBody = droppedNotice }
+        if !out.responseBodyPacked.isEmpty { out.responseBody = droppedNotice }
         return out
     }
 }
 
 extension BodyBudget {
-    public static let secondaryBodyBytes = 8 * 1024 * 1024
+    public static let secondaryBodyBytes = 2 * 1024 * 1024
 
     public static func enforce(newestFirst logs: [NetworkLog], budget: Int = secondaryBodyBytes) -> [NetworkLog] {
         var used = 0

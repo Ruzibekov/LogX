@@ -63,10 +63,10 @@ struct RequestLiveBar: View {
     private var summary: String {
         var parts: [String] = []
         parts.append(store.selectedScope.title)
-        if store.visibleLogs.count != store.allLogs.count {
+        if store.visibleLogs.count != store.logCount {
             parts.append("\(store.visibleLogs.count) ko'rinadi")
         }
-        parts.append("\(store.allLogs.count) so'rov")
+        parts.append("\(store.logCount) so'rov")
         if store.bodyBytesEstimate > 0 {
             parts.append(ByteSize.label(store.bodyBytesEstimate))
         }

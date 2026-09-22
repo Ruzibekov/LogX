@@ -67,24 +67,42 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
     public private(set) var hostLabel: String = ""
     public private(set) var pathOnly: String = ""
     public private(set) var queryString: String = ""
+    public private(set) var resolvedAppId: String = AppProfile.unknownId
+    public private(set) var isNoise: Bool = false
     public var responseCode: Int?
     public var responseMessage: String?
     public var durationMs: Int?
     public var error: String?
     public var feature: String?
-    public var packageName: String?
+    public var packageName: String? { didSet { refreshIdentity() } }
     public var source: String?
-    public var appId: String?
+    public var appId: String? { didSet { refreshIdentity() } }
     public var serial: String?
     public var device: String?
     public var deviceModel: String?
     public var deviceName: String?
     public var appVersion: String?
     public var ts: Double?
-    public var requestHeaders: [String: String]
-    public var responseHeaders: [String: String]
-    public var requestBody: String?
-    public var responseBody: String?
+    public var requestHeadersPacked: PackedHeaders
+    public var responseHeadersPacked: PackedHeaders
+    public var requestBodyPacked: PackedText
+    public var responseBodyPacked: PackedText
+    public var requestHeaders: [String: String] {
+        get { requestHeadersPacked.map }
+        set { requestHeadersPacked = PackedHeaders(newValue) }
+    }
+    public var responseHeaders: [String: String] {
+        get { responseHeadersPacked.map }
+        set { responseHeadersPacked = PackedHeaders(newValue) }
+    }
+    public var requestBody: String? {
+        get { requestBodyPacked.text }
+        set { requestBodyPacked = PackedText(newValue) }
+    }
+    public var responseBody: String? {
+        get { responseBodyPacked.text }
+        set { responseBodyPacked = PackedText(newValue) }
+    }
     public var isFull: Bool
     public var moduleId: String?
     public var moduleName: String?
@@ -108,7 +126,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         return .net
     }
 
-    public var resolvedAppId: String {
+    private static func computeAppId(url: String, appId: String?, packageName: String?) -> String {
         if let appId, AppProfile.builtIn.contains(where: { $0.id == appId }) { return appId }
         if let fromPkg = AppProfile.id(forPackage: packageName) { return fromPkg }
         let rawApp = (appId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -134,9 +152,18 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
 
     private mutating func reparseURL() {
         let parts = URLParts.parse(url.isEmpty ? api : url)
-        hostLabel = parts.host
-        pathOnly = parts.path
+        let pool = StringPool.shared
+        hostLabel = pool.intern(parts.host)
+        pathOnly = pool.intern(parts.path)
         queryString = parts.query
+        isNoise = LogNoise.isNoise(host: hostLabel, path: pathOnly)
+        refreshIdentity()
+    }
+
+    private mutating func refreshIdentity() {
+        resolvedAppId = StringPool.shared.intern(
+            NetworkLog.computeAppId(url: url, appId: appId, packageName: packageName)
+        )
     }
 
     public var statusDescription: String {
@@ -216,35 +243,36 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         responseBodyMessage: String? = nil,
         photoCount: Int? = nil
     ) {
+        let pool = StringPool.shared
         self.key = key
-        self.method = method
+        self.method = pool.intern(method.uppercased())
         self.url = url
-        self.api = api
+        self.api = (api == url) ? self.url : api
         self.responseCode = responseCode
         self.responseMessage = responseMessage
         self.durationMs = durationMs
         self.error = error
-        self.feature = feature
-        self.packageName = packageName
-        self.source = source
-        self.appId = appId
-        self.serial = serial
-        self.device = device
-        self.deviceModel = deviceModel
-        self.deviceName = deviceName
-        self.appVersion = appVersion
+        self.feature = pool.intern(feature)
+        self.packageName = pool.intern(packageName)
+        self.source = pool.intern(source)
+        self.appId = pool.intern(appId)
+        self.serial = pool.intern(serial)
+        self.device = pool.intern(device)
+        self.deviceModel = pool.intern(deviceModel)
+        self.deviceName = pool.intern(deviceName)
+        self.appVersion = pool.intern(appVersion)
         self.ts = ts
-        self.requestHeaders = requestHeaders
-        self.responseHeaders = responseHeaders
-        self.requestBody = requestBody
-        self.responseBody = responseBody
+        self.requestHeadersPacked = PackedHeaders(requestHeaders)
+        self.responseHeadersPacked = PackedHeaders(responseHeaders)
+        self.requestBodyPacked = PackedText(requestBody)
+        self.responseBodyPacked = PackedText(responseBody)
         self.isFull = isFull
-        self.moduleId = moduleId
-        self.moduleName = moduleName
-        self.environment = environment
-        self.flavor = flavor
-        self.buildType = buildType
-        self.sessionId = sessionId
+        self.moduleId = pool.intern(moduleId)
+        self.moduleName = pool.intern(moduleName)
+        self.environment = pool.intern(environment)
+        self.flavor = pool.intern(flavor)
+        self.buildType = pool.intern(buildType)
+        self.sessionId = pool.intern(sessionId)
         self.userInfoPinfl = userInfoPinfl
         self.assistantJshshir = assistantJshshir
         self.responseBodyMessage = responseBodyMessage

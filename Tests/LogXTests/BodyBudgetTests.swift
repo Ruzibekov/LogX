@@ -33,9 +33,13 @@ final class BodyBudgetTests: XCTestCase {
         XCTAssertTrue(out.responseBody?.hasSuffix(BodyBudget.truncatedNotice) == true)
     }
 
-    func testBytesCountsBothBodies() {
-        XCTAssertEqual(BodyBudget.bytes(log("k", request: "abc", response: "de")), 5)
+    func testBytesCountsRamNotRawText() {
+        XCTAssertEqual(BodyBudget.bytes(log("k", request: "abc", response: "de")), 0)
         XCTAssertEqual(BodyBudget.bytes(log("k", request: nil, response: nil)), 0)
+        let payload = String(repeating: "{\"field\":\"value\"},", count: 4000)
+        let packed = BodyBudget.bytes(log("k", request: payload, response: nil))
+        XCTAssertGreaterThan(packed, 0)
+        XCTAssertLessThan(packed, payload.utf8.count / 4, "siqilgan tana \(packed) bayt")
     }
 
     func testOldestBodiesAreDroppedWhenBudgetIsExceeded() {

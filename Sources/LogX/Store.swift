@@ -14,7 +14,8 @@ final class LogStore: ObservableObject {
     @Published var favoriteKeys: Set<String> = Set(
         UserDefaults.standard.stringArray(forKey: "logx.favoriteHashes") ?? []
     )
-    @Published private(set) var allLogs: [NetworkLog] = []
+    private(set) var allLogs: [NetworkLog] = []
+    @Published private(set) var logCount = 0
     @Published var selectedKey: String?
     @Published var detailTab: DetailTab = .response
     @Published var serverOK = false
@@ -29,7 +30,8 @@ final class LogStore: ObservableObject {
     @Published var selectedHost: String?
     @Published var lastActivityTs: Double?
     /// Pauza paytida kelgan loglar tashlanmaydi — buferda turadi, davom etilganda kiradi.
-    @Published var pendingWhilePaused: [NetworkLog] = []
+    var pendingWhilePaused: [NetworkLog] = []
+    @Published var pausedCount = 0
     /// Tanlangan so'rov hozirgi filtr bilan ro'yxatda ko'rinmayapti.
     @Published var selectedIsHidden = false
     /// Qisqa xabar (nusxalandi, tozalandi…) — ixtiyoriy amal tugmasi bilan.
@@ -76,7 +78,9 @@ final class LogStore: ObservableObject {
     var cachedErrorCount: Int = 0
     var cachedLiveApps: [(app: AppProfile, count: Int)] = []
     var cachedUniqueHosts: [String] = []
-    var cachedEndpointCounts: [String: Int] = [:]
+    var cachedEndpointCounts: [UInt64: Int] = [:]
+    var appCountsBuffer: [String: Int] = [:]
+    var hostsBuffer: Set<String> = []
     var cachedScopedCount: Int = 0
     var cachedNoiseHiddenCount: Int = 0
     var cachedLiveFavoriteCount: Int = 0
@@ -227,9 +231,11 @@ final class LogStore: ObservableObject {
     }
 
     func enforcePausedBudget() {
+        pausedCount = pendingWhilePaused.count
         let newestFirst = Array(pendingWhilePaused.reversed())
         guard BodyBudget.totalBytes(newestFirst) > BodyBudget.secondaryBodyBytes else { return }
         pendingWhilePaused = Array(BodyBudget.enforce(newestFirst: newestFirst).reversed())
+        pausedCount = pendingWhilePaused.count
     }
 
     func enforceBodyBudget() {
@@ -259,9 +265,12 @@ final class LogStore: ObservableObject {
             }
         }
         enforceBodyBudget()
-        allLogs = liveByKey.values
-            .filter { LogFilter.isLocal($0) }
-            .sorted { ($0.ts ?? 0) > ($1.ts ?? 0) }
+        allLogs.removeAll(keepingCapacity: true)
+        for log in liveByKey.values where LogFilter.isLocal(log) {
+            allLogs.append(log)
+        }
+        allLogs.sort { ($0.ts ?? 0) > ($1.ts ?? 0) }
+        logCount = allLogs.count
         apps = AppProfile.merge(api: apiApps, logs: allLogs)
         if selectedAppId != "all", !apps.contains(where: { $0.id == selectedAppId }) {
             selectedAppId = "all"

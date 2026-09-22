@@ -73,14 +73,10 @@ public enum LogFilter {
         if let code = log.responseCode, hit(String(code)) { return true }
         if hit(log.appLabel) { return true }
         if hit(log.appShortLabel) { return true }
-        for (key, value) in log.requestHeaders {
-            if hit(key) || hit(value) { return true }
-        }
-        for (key, value) in log.responseHeaders {
-            if hit(key) || hit(value) { return true }
-        }
-        if hit(log.requestBody) { return true }
-        if hit(log.responseBody) { return true }
+        if log.requestHeadersPacked.contains(q) { return true }
+        if log.responseHeadersPacked.contains(q) { return true }
+        if log.requestBodyPacked.contains(q) { return true }
+        if log.responseBodyPacked.contains(q) { return true }
         return false
     }
 

@@ -58,7 +58,7 @@ struct RequestEmptyView: View {
                     reconnectButton
                 }
             case .live, .paused:
-                if store.allLogs.isEmpty {
+                if store.logCount == 0 {
                     emptyChrome(
                         icon: store.connection == .paused ? "pause.circle" : "tray",
                         tint: store.connection == .paused ? LogXTheme.warn : LogXTheme.accentLight,
@@ -152,7 +152,7 @@ struct RequestEmptyView: View {
             icon: "line.3.horizontal.decrease.circle",
             tint: LogXTheme.warn,
             title: "Filterga mos so'rov yo'q",
-            subtitle: "Jami \(store.allLogs.count) ta jonli — boshqa ilova yoki status."
+            subtitle: "Jami \(store.logCount) ta jonli — boshqa ilova yoki status."
         ) {
             primaryCTA(icon: "arrow.counterclockwise", title: "Filtrlarni tozalash") {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
@@ -186,7 +186,7 @@ struct RequestEmptyView: View {
             icon: "cable.connector",
             tint: LogXTheme.method,
             title: "Bu USB da jonli so'rov yo'q",
-            subtitle: "Jami \(store.allLogs.count) ta jonli — boshqa ulangan qurilma."
+            subtitle: "Jami \(store.logCount) ta jonli — boshqa ulangan qurilma."
         ) {
             primaryCTA(icon: "macbook.and.iphone", title: "Barchasini ko'rish") {
                 var transaction = Transaction()

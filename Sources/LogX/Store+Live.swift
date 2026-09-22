@@ -150,9 +150,12 @@ extension LogStore {
     func ingestBatch(_ items: [NetworkLog]) {
         guard !items.isEmpty else { return }
         if isPaused {
+            var arrived: [NetworkLog] = []
+            arrived.reserveCapacity(items.count)
             for item in items where !clearedKeys.contains(item.key) {
-                pendingWhilePaused.append(BodyBudget.clamp(item))
+                arrived.append(BodyBudget.clamp(item))
             }
+            pendingWhilePaused.append(contentsOf: arrived)
             if pendingWhilePaused.count > maxLogCapacity {
                 pendingWhilePaused.removeFirst(pendingWhilePaused.count - maxLogCapacity)
             }

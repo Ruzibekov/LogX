@@ -316,7 +316,7 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
         case #selector(nextError(_:)), #selector(previousError(_:)):
             return store.errorCount > 0
         case #selector(clearLogs(_:)):
-            return !store.allLogs.isEmpty
+            return store.logCount > 0
         case #selector(undoClear(_:)):
             return store.canUndoClear
         case #selector(selectAppearance(_:)):

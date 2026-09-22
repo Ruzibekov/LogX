@@ -19,7 +19,8 @@ public struct JSONNode: Identifiable, Equatable, Sendable {
     public var scalar: String?
     public var childCount: Int
     public var subtreeEnd: Int
-    public var components: [PathComponent]
+    public var parent: Int32
+    public var arrayIndex: Int32
 
     public var displayValue: String {
         guard let scalar else { return "" }
@@ -34,7 +35,7 @@ public struct JSONNode: Identifiable, Equatable, Sendable {
 /// Tanani JSON daraxti sifatida ko'rsatish uchun DFS tartibidagi tugunlar.
 /// `subtreeEnd` yig'ilgan tugunning avlodlarini bir sakrashda tashlab o'tishga
 /// imkon beradi — yig'ish/yoyish katta tanada ham chiziqli.
-public struct JSONTree: @unchecked Sendable {
+public struct JSONTree: Sendable {
     public static let nodeLimit = 40_000
     public static let defaultExpandedDepth = 2
 
@@ -42,7 +43,7 @@ public struct JSONTree: @unchecked Sendable {
     public let identity: String
     /// Bo'sh bo'lmagan konteynerlar — «hammasini yig'ish» va toolbar holati uchun bir marta hisoblanadi.
     public let containerIDs: Set<String>
-    private let root: Any
+    private let source: String
 
     public var count: Int { nodes.count }
 
@@ -55,9 +56,9 @@ public struct JSONTree: @unchecked Sendable {
               (obj is [String: Any]) || (obj is [Any]) else { return nil }
         var out: [JSONNode] = []
         out.reserveCapacity(256)
-        guard JSONTree.walk(obj, key: "$", depth: 0, components: [], into: &out) else { return nil }
+        guard JSONTree.walk(obj, key: "$", id: "$", depth: 0, parent: -1, arrayIndex: -1, into: &out) else { return nil }
         nodes = out
-        root = obj
+        source = trimmed
         containerIDs = Set(out.filter { $0.kind.isContainer && $0.childCount > 0 }.map(\.id))
         self.identity = identity
     }
@@ -82,29 +83,41 @@ public struct JSONTree: @unchecked Sendable {
         return true
     }
 
-    private static func walk(_ value: Any, key: String, depth: Int, components: [JSONNode.PathComponent], into out: inout [JSONNode]) -> Bool {
+    private static func walk(
+        _ value: Any,
+        key: String,
+        id: String,
+        depth: Int,
+        parent: Int32,
+        arrayIndex: Int32,
+        into out: inout [JSONNode]
+    ) -> Bool {
         guard out.count < nodeLimit else { return false }
-        let id = path(components)
         let index = out.count
+        let selfIndex = Int32(index)
         if let dict = value as? [String: Any] {
-            out.append(JSONNode(id: id, key: key, kind: .object, depth: depth, scalar: nil, childCount: dict.count, subtreeEnd: index + 1, components: components))
+            out.append(JSONNode(id: id, key: key, kind: .object, depth: depth, scalar: nil, childCount: dict.count, subtreeEnd: index + 1, parent: parent, arrayIndex: arrayIndex))
             for k in dict.keys.sorted() {
-                guard walk(dict[k] as Any, key: k, depth: depth + 1, components: components + [.key(k)], into: &out) else { return false }
+                guard walk(dict[k] as Any, key: k, id: id + keySuffix(k), depth: depth + 1, parent: selfIndex, arrayIndex: -1, into: &out) else { return false }
             }
             out[index].subtreeEnd = out.count
             return true
         }
         if let arr = value as? [Any] {
-            out.append(JSONNode(id: id, key: key, kind: .array, depth: depth, scalar: nil, childCount: arr.count, subtreeEnd: index + 1, components: components))
+            out.append(JSONNode(id: id, key: key, kind: .array, depth: depth, scalar: nil, childCount: arr.count, subtreeEnd: index + 1, parent: parent, arrayIndex: arrayIndex))
             for (i, item) in arr.enumerated() {
-                guard walk(item, key: "[\(i)]", depth: depth + 1, components: components + [.index(i)], into: &out) else { return false }
+                guard walk(item, key: "[\(i)]", id: id + "[\(i)]", depth: depth + 1, parent: selfIndex, arrayIndex: Int32(i), into: &out) else { return false }
             }
             out[index].subtreeEnd = out.count
             return true
         }
         let (kind, scalar) = scalarText(value)
-        out.append(JSONNode(id: id, key: key, kind: kind, depth: depth, scalar: scalar, childCount: 0, subtreeEnd: index + 1, components: components))
+        out.append(JSONNode(id: id, key: key, kind: kind, depth: depth, scalar: scalar, childCount: 0, subtreeEnd: index + 1, parent: parent, arrayIndex: arrayIndex))
         return true
+    }
+
+    private static func keySuffix(_ key: String) -> String {
+        isIdentifier(key) ? ".\(key)" : "[\"" + key.replacingOccurrences(of: "\"", with: "\\\"") + "\"]"
     }
 
     static func scalarText(_ value: Any) -> (JSONNode.Kind, String) {
@@ -140,12 +153,7 @@ public struct JSONTree: @unchecked Sendable {
         for c in components {
             switch c {
             case .index(let i): out += "[\(i)]"
-            case .key(let k):
-                if isIdentifier(k) {
-                    out += ".\(k)"
-                } else {
-                    out += "[\"" + k.replacingOccurrences(of: "\"", with: "\\\"") + "\"]"
-                }
+            case .key(let k): out += keySuffix(k)
             }
         }
         return out
@@ -192,12 +200,15 @@ public struct JSONTree: @unchecked Sendable {
 
     /// Ota konteynerlar — topilmaga sakrashda ular yoyilgan bo'lishi kerak.
     public func ancestorIDs(of id: String) -> [String] {
-        guard let node = node(id: id) else { return [] }
+        guard let index = nodes.firstIndex(where: { $0.id == id }) else { return [] }
         var out: [String] = []
-        for n in 0..<node.components.count {
-            out.append(JSONTree.path(Array(node.components.prefix(n))))
+        var cursor = nodes[index].parent
+        while cursor >= 0 {
+            let parent = nodes[Int(cursor)]
+            out.append(parent.id)
+            cursor = parent.parent
         }
-        return out
+        return out.reversed()
     }
 
     /// Kalit yoki qiymatida so'rov uchraydigan tugunlar (DFS tartibida).
@@ -210,11 +221,26 @@ public struct JSONTree: @unchecked Sendable {
         }.map(\.id)
     }
 
+    private func pathComponents(to index: Int) -> [JSONNode.PathComponent] {
+        var out: [JSONNode.PathComponent] = []
+        var cursor = index
+        while nodes[cursor].parent >= 0 {
+            let node = nodes[cursor]
+            out.append(node.arrayIndex >= 0 ? .index(Int(node.arrayIndex)) : .key(node.key))
+            cursor = Int(node.parent)
+        }
+        return out.reversed()
+    }
+
     /// Tugun qiymati JSON matni sifatida: konteyner — formatlangan, skalyar — o'zi (satr tirnoqsiz).
     public func valueText(id: String) -> String? {
-        guard let node = node(id: id) else { return nil }
+        guard let index = nodes.firstIndex(where: { $0.id == id }) else { return nil }
+        let node = nodes[index]
+        if !node.kind.isContainer { return JSONTree.unquoted(node.scalar) }
+        guard let data = source.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data, options: []) else { return nil }
         var cursor: Any = root
-        for c in node.components {
+        for c in pathComponents(to: index) {
             switch c {
             case .key(let k):
                 guard let dict = cursor as? [String: Any], let next = dict[k] else { return nil }
@@ -224,11 +250,17 @@ public struct JSONTree: @unchecked Sendable {
                 cursor = arr[i]
             }
         }
-        if node.kind.isContainer {
-            guard let data = try? JSONSerialization.data(withJSONObject: cursor, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else { return nil }
-            return String(data: data, encoding: .utf8)
+        guard let out = try? JSONSerialization.data(withJSONObject: cursor, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else { return nil }
+        return String(data: out, encoding: .utf8)
+    }
+
+    static func unquoted(_ scalar: String?) -> String? {
+        guard let scalar else { return nil }
+        guard scalar.hasPrefix("\""), scalar.hasSuffix("\""), scalar.count >= 2 else { return scalar }
+        guard let data = scalar.data(using: .utf8),
+              let text = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) as? String else {
+            return String(scalar.dropFirst().dropLast())
         }
-        if let s = cursor as? String { return s }
-        return node.scalar
+        return text
     }
 }

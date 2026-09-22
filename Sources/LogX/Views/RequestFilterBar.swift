@@ -179,7 +179,7 @@ struct RequestFilterBar: View {
                 .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
         }
         .buttonStyle(LogXPressStyle())
-        .disabled(store.allLogs.isEmpty)
+        .disabled(store.logCount == 0)
         .keyboardShortcut("k", modifiers: .command)
         .help("Ro'yxatni tozalash (⌘K)")
         .accessibilityLabel("Ro'yxatni tozalash")

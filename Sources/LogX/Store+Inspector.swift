@@ -5,121 +5,142 @@ import UniformTypeIdentifiers
 
 extension LogStore {
     func recomputeDerivedState() {
-        var appCounts: [String: Int] = [:]
-        for log in allLogs {
-            appCounts[log.resolvedAppId, default: 0] += 1
-        }
-        cachedLiveApps = apps.compactMap { app in
-            guard let count = appCounts[app.id] else { return nil }
-            return (app, count)
-        }
-
         let scope = selectedScope
-        var scoped: [NetworkLog] = []
-        var noiseHidden = 0
-        for log in allLogs
-        where LogFilter.matchesApp(log, appId: selectedAppId) && LogFilter.matchesDevice(log, scope: scope) {
-            if hideNoise, LogNoise.isNoise(log) {
-                noiseHidden += 1
-                continue
-            }
-            scoped.append(log)
-        }
-        cachedScopedCount = scoped.count + noiseHidden
-        cachedNoiseHiddenCount = noiseHidden
-        cachedUniqueHosts = EndpointIdentity.uniqueHosts(scoped)
-        if let host = selectedHost, !host.isEmpty, !cachedUniqueHosts.contains(host) {
-            selectedHost = nil
-        }
-
-        let cheap = LogFilter.apply(
-            scoped,
-            appId: nil,
-            scope: .all,
-            status: .all,
-            query: "",
-            favoritesOnly: favoritesOnly,
-            favoriteKeys: favoriteKeys,
-            errorsOnly: false,
-            method: selectedMethod,
-            hideNoise: false,
-            slowOnly: slowOnly,
-            selectedHost: selectedHost
-        )
-        let base = applyQueryMemo(cheap)
-        var counts: [StatusClass: Int] = [
-            .all: 0, .ok2xx: 0, .redirect3xx: 0, .err4xx: 0, .err5xx: 0, .net: 0,
-        ]
-        for log in base {
-            counts[.all, default: 0] += 1
-            counts[log.statusClass, default: 0] += 1
-        }
-        cachedStatusCounts = counts
-        cachedErrorCount = (counts[.err4xx] ?? 0) + (counts[.err5xx] ?? 0) + (counts[.net] ?? 0)
-
-        var sorted = base
-        if sortField != .time || sortOrder != .descending {
-            sorted.sort { a, b in
-                let comp: Bool
-                switch sortField {
-                case .time:
-                    comp = (a.ts ?? 0) < (b.ts ?? 0)
-                case .method:
-                    comp = a.method < b.method
-                case .status:
-                    comp = (a.responseCode ?? 0) < (b.responseCode ?? 0)
-                case .duration:
-                    comp = (a.durationMs ?? 0) < (b.durationMs ?? 0)
-                case .path:
-                    comp = a.pathOnly < b.pathOnly
-                }
-                return sortOrder == .ascending ? comp : !comp
-            }
-        }
-
-        if errorsOnly {
-            cachedVisibleLogs = sorted.filter { LogFilter.errorClasses.contains($0.statusClass) }
-        } else if status == .all {
-            cachedVisibleLogs = sorted
-        } else {
-            cachedVisibleLogs = sorted.filter { $0.statusClass == status }
-        }
-        cachedVisibleKeys = Set(cachedVisibleLogs.map(\.key))
-        cachedEndpointCounts = EndpointIdentity.counts(in: cachedVisibleLogs)
+        collectAppCounts()
+        collectScope(scope: scope)
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        prepareQueryMemo(trimmedQuery)
+        collectVisible(scope: scope, query: trimmedQuery)
         cachedLiveFavoriteCount = favoriteKeys.isEmpty ? 0 : allLogs.reduce(0) { $0 + (favoriteKeys.contains(FavoriteKey.hash($1.key)) ? 1 : 0) }
         publishConnection()
     }
 
-    /// Tana bo'ylab qidiruv har log uchun bir marta hisoblanadi: har yangi batch'da
-    /// faqat yangi kalitlar tekshiriladi, kesh so'rov matni o'zgarganda tozalanadi.
-    func applyQueryMemo(_ logs: [NetworkLog]) -> [NetworkLog] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else {
+    private func collectAppCounts() {
+        appCountsBuffer.removeAll(keepingCapacity: true)
+        for log in allLogs {
+            appCountsBuffer[log.resolvedAppId, default: 0] += 1
+        }
+        cachedLiveApps = apps.compactMap { app in
+            guard let count = appCountsBuffer[app.id] else { return nil }
+            return (app, count)
+        }
+    }
+
+    private func collectScope(scope: DeviceScope) {
+        var noiseHidden = 0
+        var scoped = 0
+        let wantedApp = resolvedAppFilter()
+        hostsBuffer.removeAll(keepingCapacity: true)
+        for log in allLogs
+        where matchesApp(log, wanted: wantedApp) && LogFilter.matchesDevice(log, scope: scope) {
+            scoped += 1
+            if hideNoise, log.isNoise {
+                noiseHidden += 1
+                continue
+            }
+            if !log.hostLabel.isEmpty { hostsBuffer.insert(log.hostLabel) }
+        }
+        cachedScopedCount = scoped
+        cachedNoiseHiddenCount = noiseHidden
+        cachedUniqueHosts = hostsBuffer.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        if let host = selectedHost, !host.isEmpty, !cachedUniqueHosts.contains(host) {
+            selectedHost = nil
+        }
+    }
+
+    private func resolvedAppFilter() -> String? {
+        let raw = selectedAppId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty, raw != "all" else { return nil }
+        return AppProfile.resolveId(raw)
+    }
+
+    private func matchesApp(_ log: NetworkLog, wanted: String?) -> Bool {
+        guard let wanted else { return true }
+        return log.resolvedAppId == wanted
+    }
+
+    private func normalizedMethodFilter() -> String? {
+        let raw = selectedMethod.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return (raw.isEmpty || raw == "ALL") ? nil : raw
+    }
+
+    private func collectVisible(scope: DeviceScope, query trimmedQuery: String) {
+        var counts: [StatusClass: Int] = [
+            .all: 0, .ok2xx: 0, .redirect3xx: 0, .err4xx: 0, .err5xx: 0, .net: 0,
+        ]
+        let statusFilter: StatusClass? = (errorsOnly || status == .all) ? nil : status
+        let wantedApp = resolvedAppFilter()
+        let wantedMethod = normalizedMethodFilter()
+        let wantedHost = (selectedHost?.isEmpty == false) ? selectedHost : nil
+        cachedVisibleLogs.removeAll(keepingCapacity: true)
+        cachedVisibleKeys.removeAll(keepingCapacity: true)
+        cachedEndpointCounts.removeAll(keepingCapacity: true)
+        for log in allLogs {
+            guard matchesApp(log, wanted: wantedApp),
+                  LogFilter.matchesDevice(log, scope: scope) else { continue }
+            if hideNoise, log.isNoise { continue }
+            if let wantedMethod, log.method != wantedMethod { continue }
+            if let wantedHost, log.hostLabel.caseInsensitiveCompare(wantedHost) != .orderedSame { continue }
+            guard LogFilter.matchesSlow(log, slowOnly: slowOnly) else { continue }
+            if favoritesOnly, !favoriteKeys.contains(FavoriteKey.hash(log.key)) { continue }
+            if !trimmedQuery.isEmpty, !queryHit(log, query: trimmedQuery) { continue }
+            let statusClass = log.statusClass
+            counts[.all, default: 0] += 1
+            counts[statusClass, default: 0] += 1
+            if errorsOnly {
+                guard statusClass.isFailure else { continue }
+            } else if let statusFilter, statusClass != statusFilter {
+                continue
+            }
+            cachedVisibleLogs.append(log)
+            cachedVisibleKeys.insert(log.key)
+            cachedEndpointCounts[EndpointIdentity.hash(for: log), default: 0] += 1
+        }
+        cachedStatusCounts = counts
+        cachedErrorCount = (counts[.err4xx] ?? 0) + (counts[.err5xx] ?? 0) + (counts[.net] ?? 0)
+        sortVisible()
+    }
+
+    private func sortVisible() {
+        guard sortField != .time || sortOrder != .descending else { return }
+        cachedVisibleLogs.sort { a, b in
+            let comp: Bool
+            switch sortField {
+            case .time:
+                comp = (a.ts ?? 0) < (b.ts ?? 0)
+            case .method:
+                comp = a.method < b.method
+            case .status:
+                comp = (a.responseCode ?? 0) < (b.responseCode ?? 0)
+            case .duration:
+                comp = (a.durationMs ?? 0) < (b.durationMs ?? 0)
+            case .path:
+                comp = a.pathOnly < b.pathOnly
+            }
+            return sortOrder == .ascending ? comp : !comp
+        }
+    }
+
+    private func prepareQueryMemo(_ trimmedQuery: String) {
+        guard !trimmedQuery.isEmpty else {
             queryMatchCache.removeAll(keepingCapacity: true)
             queryMatchCacheFor = ""
-            return logs
+            return
         }
-        if queryMatchCacheFor != q {
+        if queryMatchCacheFor != trimmedQuery {
             queryMatchCache.removeAll(keepingCapacity: true)
-            queryMatchCacheFor = q
-        }
-        var out: [NetworkLog] = []
-        out.reserveCapacity(logs.count)
-        for log in logs {
-            let hit: Bool
-            if let cached = queryMatchCache[log.key] {
-                hit = cached
-            } else {
-                hit = LogFilter.matchesSmartQuery(log, query: q)
-                queryMatchCache[log.key] = hit
-            }
-            if hit { out.append(log) }
+            queryMatchCacheFor = trimmedQuery
         }
         if queryMatchCache.count > maxLogCapacity * 2 {
-            let live = Set(logs.map(\.key))
-            queryMatchCache = queryMatchCache.filter { live.contains($0.key) }
+            queryMatchCache.removeAll(keepingCapacity: true)
         }
-        return out
+    }
+
+    private func queryHit(_ log: NetworkLog, query: String) -> Bool {
+        if let cached = queryMatchCache[log.key] { return cached }
+        let hit = LogFilter.matchesSmartQuery(log, query: query)
+        queryMatchCache[log.key] = hit
+        return hit
     }
 
     func persistPrefs() {

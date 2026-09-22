@@ -7,6 +7,7 @@ extension LogStore {
         if !isPaused, !pendingWhilePaused.isEmpty {
             let buffered = pendingWhilePaused
             pendingWhilePaused = []
+            pausedCount = 0
             ingestBatch(buffered)
         }
         publishConnection()
@@ -36,6 +37,7 @@ extension LogStore {
         liveByKey.removeAll()
         bodyBytesEstimate = 0
         pendingWhilePaused = []
+        pausedCount = 0
         lastActivityTs = nil
         rebuildFromLive()
         selectedKey = nil

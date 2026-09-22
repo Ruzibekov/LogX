@@ -8,10 +8,27 @@ public enum EndpointIdentity {
         return "\(method) \(host) \(path)"
     }
 
-    public static func counts(in logs: [NetworkLog]) -> [String: Int] {
-        var map: [String: Int] = [:]
+    public static func hash(for log: NetworkLog) -> UInt64 {
+        var h: UInt64 = 0xcbf2_9ce4_8422_2325
+        func mix(_ text: String, upper: Bool) {
+            for byte in text.utf8 {
+                let value = upper && byte >= 0x61 && byte <= 0x7A ? byte - 32 : byte
+                h ^= UInt64(value)
+                h = h &* 0x0000_0100_0000_01b3
+            }
+            h ^= 0x20
+            h = h &* 0x0000_0100_0000_01b3
+        }
+        mix(log.method, upper: true)
+        mix(log.hostLabel, upper: false)
+        mix(log.pathOnly, upper: false)
+        return h
+    }
+
+    public static func counts(in logs: [NetworkLog]) -> [UInt64: Int] {
+        var map: [UInt64: Int] = [:]
         for log in logs {
-            map[key(for: log), default: 0] += 1
+            map[hash(for: log), default: 0] += 1
         }
         return map
     }

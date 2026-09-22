@@ -41,7 +41,7 @@ extension LogStore {
     var hasMultipleHosts: Bool { cachedUniqueHosts.count > 1 }
 
     func repeatCount(for log: NetworkLog) -> Int {
-        cachedEndpointCounts[EndpointIdentity.key(for: log)] ?? 1
+        cachedEndpointCounts[EndpointIdentity.hash(for: log)] ?? 1
     }
 
     var hasActiveFilter: Bool {
@@ -55,7 +55,7 @@ extension LogStore {
             || !(selectedHost ?? "").isEmpty
     }
 
-    var pendingWhilePausedCount: Int { pendingWhilePaused.count }
+    var pendingWhilePausedCount: Int { pausedCount }
 
     /// Log xotira sig'imiga yaqin — eng eskilari tushib ketadi.
     var isNearCapacity: Bool { liveByKey.count >= maxLogCapacity * 9 / 10 }

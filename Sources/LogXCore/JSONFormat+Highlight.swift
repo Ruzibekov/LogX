@@ -4,6 +4,16 @@ public enum JSONSpanKind: String, Sendable, Equatable {
     case key, string, number, boolNull, punct, plain
 }
 
+public struct JSONRun: Equatable, Sendable {
+    public var length: Int
+    public var kind: JSONSpanKind
+
+    public init(length: Int, kind: JSONSpanKind) {
+        self.length = length
+        self.kind = kind
+    }
+}
+
 public struct JSONSpan: Equatable, Sendable {
     public var text: String
     public var kind: JSONSpanKind
@@ -16,12 +26,35 @@ public struct JSONSpan: Equatable, Sendable {
 
 extension JSONFormat {
     public static func highlight(_ text: String) -> [JSONSpan] {
+        guard !text.isEmpty else { return [] }
+        var out: [JSONSpan] = []
+        out.reserveCapacity(64)
+        var cursor = text.startIndex
+        let utf16View = text.utf16
+        var utf16Cursor = utf16View.startIndex
+        for run in highlightRuns(text) {
+            guard let end = utf16View.index(utf16Cursor, offsetBy: run.length, limitedBy: utf16View.endIndex),
+                  let endIndex = end.samePosition(in: text) else { break }
+            out.append(JSONSpan(String(text[cursor..<endIndex]), run.kind))
+            cursor = endIndex
+            utf16Cursor = end
+        }
+        return out
+    }
+
+    public static func highlightRuns(_ text: String) -> [JSONRun] {
         if text.isEmpty { return [] }
-        var spans: [JSONSpan] = []
+        var spans: [JSONRun] = []
         var i = text.startIndex
 
         func push(_ start: String.Index, _ end: String.Index, _ kind: JSONSpanKind) {
-            if start < end { spans.append(JSONSpan(String(text[start..<end]), kind)) }
+            guard start < end else { return }
+            let length = text[start..<end].utf16.count
+            if kind == .plain, let last = spans.last, last.kind == .plain {
+                spans[spans.count - 1].length += length
+            } else {
+                spans.append(JSONRun(length: length, kind: kind))
+            }
         }
         func isWord(_ c: Character) -> Bool { c.isLetter || c.isNumber || c == "_" }
         func boundary(_ idx: String.Index) -> Bool {
@@ -116,7 +149,7 @@ extension JSONFormat {
             }
             push(start, i, .plain)
         }
-        return mergePlain(spans)
+        return spans
     }
 
     public static func highlightHeaders(_ text: String) -> [JSONSpan] {
@@ -141,16 +174,7 @@ extension JSONFormat {
         return spans
     }
 
-    private static func mergePlain(_ spans: [JSONSpan]) -> [JSONSpan] {
-        var out: [JSONSpan] = []
-        for s in spans {
-            if s.text.isEmpty { continue }
-            if let last = out.last, last.kind == s.kind, s.kind == .plain {
-                out[out.count - 1].text += s.text
-            } else {
-                out.append(s)
-            }
-        }
-        return out
+    public static func highlightHeaderRuns(_ text: String) -> [JSONRun] {
+        highlightHeaders(text).map { JSONRun(length: ($0.text as NSString).length, kind: $0.kind) }
     }
 }

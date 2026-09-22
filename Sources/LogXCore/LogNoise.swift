@@ -22,8 +22,12 @@ public enum LogNoise {
     private static let imageExts = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg"]
 
     public static func isNoise(_ log: NetworkLog) -> Bool {
-        let host = log.hostLabel.lowercased()
-        let path = log.pathOnly.lowercased()
+        log.isNoise
+    }
+
+    public static func isNoise(host rawHost: String, path rawPath: String) -> Bool {
+        let host = rawHost.lowercased()
+        let path = rawPath.lowercased()
         if hostIsNoise(host) { return true }
         if pathHasAnalytics(path) { return true }
         if isHealthPath(path) { return true }
