@@ -10,10 +10,6 @@ struct DetailHeader: View {
     var onShare: () -> Void = {}
     @State private var urlCopied = false
     @AppStorage("logx.detailHeaderCollapsed") private var isCollapsed = false
-    @State private var headerWidth: CGFloat = 900
-
-    static let labelledActionsMinWidth: CGFloat = 700
-
     var body: some View {
         VStack(alignment: .leading, spacing: isCollapsed ? 10 : 16) {
             HStack(alignment: .center, spacing: 10) {
@@ -77,23 +73,23 @@ struct DetailHeader: View {
         .padding(.top, 18)
         .padding(.bottom, 14)
         .background(LogXTheme.bg)
-        .background(GeometryReader { geo in Color.clear.preference(key: DetailHeaderWidthKey.self, value: geo.size.width) })
-        .onPreferenceChange(DetailHeaderWidthKey.self) { width in
-            if width > 0, abs(width - headerWidth) > 4 { headerWidth = width }
-        }
     }
 
     private var actions: some View {
-        actionRow(labelled: headerWidth >= Self.labelledActionsMinWidth)
+        ViewThatFits(in: .horizontal) {
+            actionRow(labelled: true)
+            actionRow(labelled: false)
+            actionRow(labelled: false, primaryLabelled: false)
+        }
     }
 
-    private func actionRow(labelled: Bool) -> some View {
+    private func actionRow(labelled: Bool, primaryLabelled: Bool = true) -> some View {
         HStack(spacing: 8) {
             actionPill(
                 store.selectedIsReplaying ? "Yuborilmoqda…" : "Qayta yuborish",
                 icon: "paperplane",
                 kind: .primary,
-                labelled: true,
+                labelled: primaryLabelled,
                 help: store.replayBlocker(log) ?? "So'rovni Mac'dan qayta yuborish — javob ro'yxatga REPLAY bo'lib tushadi (⌘⏎)"
             ) {
                 store.replay(log)
@@ -337,9 +333,4 @@ enum DetailFacts {
     static func reasonIsShort(_ reason: String) -> Bool {
         reason.count <= 16
     }
-}
-
-private struct DetailHeaderWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 900
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }

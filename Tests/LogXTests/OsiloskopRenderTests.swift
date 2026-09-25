@@ -115,7 +115,7 @@ final class OsiloskopRenderTests: XCTestCase {
         .environmentObject(s)
     }
 
-    private func render(appearance: NSAppearance.Name, name: String) throws -> NSBitmapImageRep {
+    private func render(appearance: NSAppearance.Name, name: String, size: CGSize = CGSize(width: 1440, height: 900)) throws -> NSBitmapImageRep {
         LogXFonts.register(directory: Self.root.appendingPathComponent("Resources/Fonts"))
         XCTAssertTrue(LogXFonts.isAvailable(.mono))
         XCTAssertTrue(LogXFonts.isAvailable(.ui))
@@ -124,7 +124,6 @@ final class OsiloskopRenderTests: XCTestCase {
         UserDefaults.standard.set(false, forKey: "logx.treeBody")
         UserDefaults.standard.set(true, forKey: "logx.prettyBody")
         let s = store(sampleLogs(now: Date()))
-        let size = CGSize(width: 1440, height: 900)
         let host = NSHostingView(rootView: window(s).frame(width: size.width, height: size.height))
         host.appearance = NSAppearance(named: appearance)
         host.frame = CGRect(origin: .zero, size: size)
@@ -172,5 +171,10 @@ final class OsiloskopRenderTests: XCTestCase {
             assertNear(pixelHex(rep, x: 700, y: 20), LogXPalette.chrome.hex(isDark: isDark), "\(name) toolbar chrome")
             assertNear(pixelHex(rep, x: 900, y: 893), LogXPalette.chrome.hex(isDark: isDark), "\(name) status bar chrome")
         }
+    }
+
+    func testNarrowWindowKeepsDetailMetaReadable() throws {
+        let rep = try render(appearance: .darkAqua, name: "osiloskop-narrow", size: CGSize(width: 1100, height: 760))
+        XCTAssertGreaterThanOrEqual(rep.pixelsWide, 1100)
     }
 }

@@ -29,18 +29,18 @@ extension RequestDetail {
         HStack(spacing: 8) {
             viewModeSegment(treeAvailable: treeAvailable)
             DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : (rendered?.matchCount ?? 0))
-                .frame(minWidth: 210, maxWidth: 240)
+                .frame(minWidth: 120, maxWidth: 240)
+                .layoutPriority(1)
             Spacer(minLength: 8)
-            Text(bodyMeta(log: log, rendered: rendered))
-                .font(LogXType.mono(LogXType.caption))
-                .foregroundStyle(LogXTheme.muted)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(bodyMeta(log: log, rendered: rendered))
-            if tab == .request || tab == .response {
-                zoomControls
+            ViewThatFits(in: .horizontal) {
+                trailingTools(meta: bodyMeta(log: log, rendered: rendered), zoom: true, log: log)
+                trailingTools(meta: bodyMeta(log: log, rendered: rendered, includeType: false), zoom: true, log: log)
+                trailingTools(meta: bodyMeta(log: log, rendered: rendered, includeType: false, includeLines: false), zoom: true, log: log)
+                trailingTools(meta: nil, zoom: true, log: log)
+                trailingTools(meta: nil, zoom: false, log: log)
+                copyBodyButton(log: log, labelled: false)
             }
-            copyBodyButton(log: log)
+            .help(bodyMeta(log: log, rendered: rendered))
         }
         .padding(.horizontal, 22)
         .frame(minHeight: 40)
@@ -48,14 +48,31 @@ extension RequestDetail {
         .overlay(alignment: .bottom) { Rectangle().fill(LogXTheme.divider).frame(height: 1) }
     }
 
-    func bodyMeta(log: NetworkLog, rendered: RenderedBody?) -> String {
+    func trailingTools(meta: String?, zoom: Bool, log: NetworkLog) -> some View {
+        HStack(spacing: 8) {
+            if let meta { metaText(meta) }
+            if zoom, tab == .request || tab == .response { zoomControls }
+            copyBodyButton(log: log, labelled: true)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    func metaText(_ text: String) -> some View {
+        Text(text)
+            .font(LogXType.mono(LogXType.caption))
+            .foregroundStyle(LogXTheme.muted)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    func bodyMeta(log: NetworkLog, rendered: RenderedBody?, includeType: Bool = true, includeLines: Bool = true) -> String {
         var parts: [String] = []
         if let rendered {
             parts.append(ByteSize.label(rendered.text.utf8.count))
-            if rendered.lineCount > 1 { parts.append("\(rendered.lineCount) qator") }
+            if includeLines, rendered.lineCount > 1 { parts.append("\(rendered.lineCount) qator") }
         }
         let headers = (tab == .request) ? log.requestHeaders : log.responseHeaders
-        if let type = headers.first(where: { $0.key.lowercased() == "content-type" })?.value {
+        if includeType, let type = headers.first(where: { $0.key.lowercased() == "content-type" })?.value {
             parts.append(type.split(separator: ";").first.map(String.init) ?? type)
         }
         return parts.joined(separator: " · ")
@@ -121,15 +138,17 @@ extension RequestDetail {
         .accessibilityValue(isWrapBody ? "yoqilgan" : "o'chirilgan")
     }
 
-    func copyBodyButton(log: NetworkLog) -> some View {
+    func copyBodyButton(log: NetworkLog, labelled: Bool = true) -> some View {
         Button {
             copy(JSONFormat.body(for: log, tab: tab, redact: store.redactEnabled, pretty: prettyBody))
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 10, weight: .semibold))
-                Text(copied ? "Nusxalandi" : "Nusxa")
-                    .font(LogXType.ui(LogXType.meta, .medium))
+                if labelled {
+                    Text(copied ? "Nusxalandi" : "Nusxa")
+                        .font(LogXType.ui(LogXType.meta, .medium))
+                }
             }
             .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.text2)
         }

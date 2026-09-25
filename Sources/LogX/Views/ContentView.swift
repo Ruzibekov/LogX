@@ -19,7 +19,7 @@ struct ContentView: View {
                 RequestList()
                     .frame(minWidth: 380, idealWidth: 460, maxWidth: 620)
                 RequestDetail()
-                    .frame(minWidth: 420, maxWidth: .infinity)
+                    .frame(minWidth: 460, maxWidth: .infinity)
                     .sheet(item: Binding(get: { store.replayComposerLog }, set: { store.replayComposerLog = $0 })) { log in
                         ReplayComposerView(log: log)
                             .environmentObject(store)

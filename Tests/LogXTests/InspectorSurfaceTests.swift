@@ -57,7 +57,7 @@ final class InspectorSurfaceTests: XCTestCase {
         let content = try source("Sources/LogX/Views/ContentView.swift")
         XCTAssertTrue(content.contains("HSplitView"), content)
         XCTAssertTrue(content.contains("minWidth: 380, idealWidth: 460"), content)
-        XCTAssertTrue(content.contains("minWidth: 420, maxWidth: .infinity"), content)
+        XCTAssertTrue(content.contains("minWidth: 460, maxWidth: .infinity"), content)
         XCTAssertTrue(content.contains("logx.sidebarVisible"), content)
         XCTAssertFalse(content.contains("max: 920"), content)
         XCTAssertFalse(content.contains("max: 680"), content)
