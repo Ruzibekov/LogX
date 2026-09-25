@@ -1,6 +1,11 @@
 import Foundation
 import LogXCore
 
+@MainActor
+final class RowHover: ObservableObject {
+    @Published var key: String?
+}
+
 struct Toast: Identifiable, Equatable {
     let id = UUID()
     var text: String

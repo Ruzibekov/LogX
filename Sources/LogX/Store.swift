@@ -19,6 +19,7 @@ final class LogStore: ObservableObject {
     private(set) var allLogs: [NetworkLog] = []
     @Published private(set) var logCount = 0
     @Published var selectedKey: String?
+    let rowHover = RowHover()
     @Published var detailTab: DetailTab = .response
     @Published var serverOK = false
     @Published private(set) var banner: String?

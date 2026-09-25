@@ -121,7 +121,7 @@ struct RequestList: View {
                             showTimeColumn: showTimeColumn
                         )
                             .id(log.key)
-                            .listRowBackground(RequestRowBackground(selected: store.selectedKey == log.key))
+                            .listRowBackground(RequestRowBackground(selected: store.selectedKey == log.key, key: log.key, hover: store.rowHover))
                             .listRowSeparator(.hidden)
                             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                             .contextMenu { rowMenu(log) }

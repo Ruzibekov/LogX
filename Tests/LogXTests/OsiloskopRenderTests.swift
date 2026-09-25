@@ -115,7 +115,7 @@ final class OsiloskopRenderTests: XCTestCase {
         .environmentObject(s)
     }
 
-    private func render(appearance: NSAppearance.Name, name: String, size: CGSize = CGSize(width: 1440, height: 900)) throws -> NSBitmapImageRep {
+    private func render(appearance: NSAppearance.Name, name: String, size: CGSize = CGSize(width: 1440, height: 900), hoverPath: String? = nil) throws -> NSBitmapImageRep {
         LogXFonts.register(directory: Self.root.appendingPathComponent("Resources/Fonts"))
         XCTAssertTrue(LogXFonts.isAvailable(.mono))
         XCTAssertTrue(LogXFonts.isAvailable(.ui))
@@ -124,6 +124,10 @@ final class OsiloskopRenderTests: XCTestCase {
         UserDefaults.standard.set(false, forKey: "logx.treeBody")
         UserDefaults.standard.set(true, forKey: "logx.prettyBody")
         let s = store(sampleLogs(now: Date()))
+        if let hoverPath {
+            s.rowHover.key = s.visibleLogs.first { $0.url.contains(hoverPath) }?.key
+            XCTAssertNotNil(s.rowHover.key)
+        }
         let host = NSHostingView(rootView: window(s).frame(width: size.width, height: size.height))
         host.appearance = NSAppearance(named: appearance)
         host.frame = CGRect(origin: .zero, size: size)
@@ -186,5 +190,13 @@ final class OsiloskopRenderTests: XCTestCase {
             return g > 150 && g > r + 40 && g > b + 40
         }
         XCTAssertFalse(hits.isEmpty, "selected row accent bar is not flush with the list edge at x=57")
+    }
+
+    func testHoveredRowFillReachesListEdge() throws {
+        let rep = try render(appearance: .darkAqua, name: "osiloskop-hover", hoverPath: "/api/v1/objects")
+        let brightness: (Int) -> Int = { (($0 >> 16) & 0xFF) + (($0 >> 8) & 0xFF) + ($0 & 0xFF) }
+        let hovered = pixelHex(rep, x: 57, y: 320)
+        let idle = pixelHex(rep, x: 57, y: 375)
+        XCTAssertGreaterThanOrEqual(brightness(hovered) - brightness(idle), 9, "hover fill starts inside the cell inset: \(String(format: "%06X", hovered)) vs \(String(format: "%06X", idle))")
     }
 }

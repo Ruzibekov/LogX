@@ -27,13 +27,12 @@ struct RequestRow: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: Self.height)
-        .background(rowBackground)
         .contentShape(Rectangle())
         .opacity(entered ? 1 : 0)
         .offset(y: entered ? 0 : -LogXMotion.rowInsertOffset)
         .onAppear(perform: enter)
         .onTapGesture { store.selectLog(log) }
-        .onHover { hovered = $0 }
+        .onHover(perform: trackHover)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .accessibilityLabel("\(log.method) \(log.responseCode.map(String.init) ?? "NET") \(store.displayPath(log))")
@@ -45,8 +44,13 @@ struct RequestRow: View {
         withAnimation(animation) { entered = true }
     }
 
-    private var rowBackground: Color {
-        hovered && !selected ? LogXTheme.panel2.opacity(0.6) : Color.clear
+    private func trackHover(_ inside: Bool) {
+        hovered = inside
+        if inside {
+            store.rowHover.key = log.key
+        } else if store.rowHover.key == log.key {
+            store.rowHover.key = nil
+        }
     }
 
     private var statusPill: some View {
@@ -206,10 +210,12 @@ enum RowEntrance {
 
 struct RequestRowBackground: View {
     var selected: Bool
+    var key: String?
+    @ObservedObject var hover: RowHover
 
     var body: some View {
         ZStack(alignment: .leading) {
-            selected ? LogXTheme.selection : Color.clear
+            fill
             if selected {
                 Rectangle().fill(LogXTheme.accent).frame(width: 3)
             }
@@ -217,5 +223,23 @@ struct RequestRowBackground: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(LogXTheme.divider).frame(height: 1)
         }
+        .animation(LogXMotion.hover, value: hovered)
+        .onHover(perform: track)
+    }
+
+    private func track(_ inside: Bool) {
+        guard let key else { return }
+        if inside {
+            hover.key = key
+        } else if hover.key == key {
+            hover.key = nil
+        }
+    }
+
+    private var hovered: Bool { key != nil && hover.key == key }
+
+    private var fill: Color {
+        if selected { return LogXTheme.selection }
+        return hovered ? LogXTheme.panel2.opacity(0.6) : Color.clear
     }
 }
