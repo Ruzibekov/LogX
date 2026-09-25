@@ -73,15 +73,12 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
     public var responseMessage: String?
     public var durationMs: Int?
     public var error: String?
-    public var feature: String?
     public var packageName: String? { didSet { refreshIdentity() } }
-    public var source: String?
     public var appId: String? { didSet { refreshIdentity() } }
     public var serial: String?
     public var device: String?
     public var deviceModel: String?
     public var deviceName: String?
-    public var appVersion: String?
     public var ts: Double?
     public var requestHeadersPacked: PackedHeaders
     public var responseHeadersPacked: PackedHeaders
@@ -104,16 +101,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         set { responseBodyPacked = PackedText(newValue) }
     }
     public var isFull: Bool
-    public var moduleId: String?
-    public var moduleName: String?
-    public var environment: String?
-    public var flavor: String?
-    public var buildType: String?
-    public var sessionId: String?
-    public var userInfoPinfl: String?
-    public var assistantJshshir: String?
-    public var responseBodyMessage: String?
-    public var photoCount: Int?
+    var metaBox: NetworkLogMetaBox = .empty
 
     public var id: String { key }
 
@@ -252,31 +240,33 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         self.responseMessage = responseMessage
         self.durationMs = durationMs
         self.error = error
-        self.feature = pool.intern(feature)
         self.packageName = pool.intern(packageName)
-        self.source = pool.intern(source)
         self.appId = pool.intern(appId)
         self.serial = pool.intern(serial)
         self.device = pool.intern(device)
         self.deviceModel = pool.intern(deviceModel)
         self.deviceName = pool.intern(deviceName)
-        self.appVersion = pool.intern(appVersion)
         self.ts = ts
         self.requestHeadersPacked = PackedHeaders(requestHeaders)
         self.responseHeadersPacked = PackedHeaders(responseHeaders)
         self.requestBodyPacked = PackedText(requestBody)
         self.responseBodyPacked = PackedText(responseBody)
         self.isFull = isFull
-        self.moduleId = pool.intern(moduleId)
-        self.moduleName = pool.intern(moduleName)
-        self.environment = pool.intern(environment)
-        self.flavor = pool.intern(flavor)
-        self.buildType = pool.intern(buildType)
-        self.sessionId = pool.intern(sessionId)
-        self.userInfoPinfl = userInfoPinfl
-        self.assistantJshshir = assistantJshshir
-        self.responseBodyMessage = responseBodyMessage
-        self.photoCount = photoCount
+        self.metaBox = NetworkLogMetaBox.make(NetworkLogMeta(
+            feature: pool.intern(feature),
+            source: pool.intern(source),
+            appVersion: pool.intern(appVersion),
+            moduleId: pool.intern(moduleId),
+            moduleName: pool.intern(moduleName),
+            environment: pool.intern(environment),
+            flavor: pool.intern(flavor),
+            buildType: pool.intern(buildType),
+            sessionId: pool.intern(sessionId),
+            userInfoPinfl: userInfoPinfl,
+            assistantJshshir: assistantJshshir,
+            responseBodyMessage: responseBodyMessage,
+            photoCount: photoCount
+        ))
         reparseURL()
     }
 }
