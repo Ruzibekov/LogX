@@ -110,4 +110,47 @@ final class TreeFindTests: XCTestCase {
         XCTAssertTrue(TreeFindHighlight.text("city", query: "street", active: false).runs.allSatisfy { $0.backgroundColor == nil })
         XCTAssertTrue(TreeFindHighlight.text("street", query: "", active: false).runs.allSatisfy { $0.backgroundColor == nil })
     }
+
+    func testIndicatorShowsOnlyMatchedTextInBrightYellow() throws {
+        let indicator = try XCTUnwrap(TreeFindHighlight.indicator("\"Navoiy street\"", query: "Street"))
+        let visible = indicator.runs.filter { $0.foregroundColor != .clear }
+        XCTAssertEqual(visible.count, 1)
+        XCTAssertEqual(visible.first.map { String(indicator[$0.range].characters) }, "street")
+        XCTAssertEqual(visible.first?.backgroundColor, TreeFindHighlight.indicatorBackground)
+        XCTAssertEqual(String(indicator.characters), "\"Navoiy street\"", "overlay matn qator bilan bir xil joylashishi uchun to'liq qoladi")
+        XCTAssertNil(TreeFindHighlight.indicator("city", query: "street"))
+        XCTAssertNil(TreeFindHighlight.indicator("street", query: " "))
+    }
+
+    func testActiveRowShowsYellowFindIndicatorAfterReveal() throws {
+        let tree = try XCTUnwrap(JSONTree(text: items(300), identity: "t5"))
+        let model = Model()
+        let (win, _) = window(tree, model)
+        defer { win.close() }
+        let host = try XCTUnwrap(win.contentView)
+        func yellowPixels() -> Int {
+            guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return 0 }
+            host.cacheDisplay(in: host.bounds, to: rep)
+            var total = 0
+            for y in stride(from: 0, to: rep.pixelsHigh, by: 2) {
+                for x in stride(from: 0, to: rep.pixelsWide, by: 2) {
+                    guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                    if c.redComponent > 0.92, c.greenComponent > 0.82, c.blueComponent < 0.45 { total += 1 }
+                }
+            }
+            return total
+        }
+        XCTAssertEqual(yellowPixels(), 0)
+        model.query = "s250x"
+        spin(0.45)
+        let shown = yellowPixels()
+        if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+            host.cacheDisplay(in: host.bounds, to: rep)
+            let dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".screenshots")
+            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("render-tree-find-indicator.png"))
+        }
+        XCTAssertGreaterThan(shown, 20, "faol topilmada sariq find belgisi ko'rinmadi")
+        spin(1.6)
+        XCTAssertEqual(yellowPixels(), 0, "find belgisi o'zi so'nishi kerak")
+    }
 }
