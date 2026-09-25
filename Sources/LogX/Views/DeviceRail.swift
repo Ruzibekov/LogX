@@ -35,7 +35,7 @@ struct DeviceRail: View {
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(LogXTheme.muted2)
                     .frame(width: 40, height: 40)
-                    .help("USB yo'q — telefonni ulang")
+                    .help(store.adbConflict == nil ? "USB yo'q — telefonni ulang" : "USB band — boshqa adb server qurilmani ushlab turibdi")
             }
 
             Spacer(minLength: 8)

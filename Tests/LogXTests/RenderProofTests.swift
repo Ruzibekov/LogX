@@ -110,6 +110,23 @@ final class RenderProofTests: XCTestCase {
         )
     }
 
+    func testAdbConflictEmptyStateRenders() throws {
+        let s = store([])
+        s.connection = .noDevice
+        s.adbConflict = AdbConflict(port: 5038, pid: 30963, serials: ["97750348124377"], fix: "adb -P 5038 kill-server && adb kill-server && adb devices")
+        try render(
+            RequestEmptyView().environmentObject(s).background(LogXTheme.bg),
+            size: CGSize(width: 560, height: 420),
+            name: "render-empty-adb-conflict"
+        )
+        s.adbReclaimInFlight = true
+        try render(
+            RequestEmptyView().environmentObject(s).background(LogXTheme.bg),
+            size: CGSize(width: 380, height: 420),
+            name: "render-empty-adb-conflict-busy"
+        )
+    }
+
     func testFilterBarRenders() throws {
         let s = store(sample())
         try render(

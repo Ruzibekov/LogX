@@ -16,6 +16,15 @@ struct RequestEmptyView: View {
                 ) {
                     reconnectButton
                 }
+            case .noDevice where store.adbConflict != nil:
+                emptyChrome(
+                    icon: "lock.trianglebadge.exclamationmark",
+                    tint: LogXTheme.warn,
+                    title: "USB band",
+                    subtitle: store.adbConflict?.subtitle ?? ""
+                ) {
+                    AdbConflictActions()
+                }
             case .noDevice:
                 emptyChrome(
                     icon: "cable.connector.slash",

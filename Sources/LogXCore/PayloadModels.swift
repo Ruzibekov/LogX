@@ -4,15 +4,17 @@ public struct DevicesPayload: Decodable {
     public var ok: Bool?
     public var error: String?
     public var devices: [ConnectedDevice]
+    public var adbConflict: AdbConflict?
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         ok = try c.decodeIfPresent(Bool.self, forKey: .ok)
         error = try c.decodeIfPresent(String.self, forKey: .error)
         devices = try c.decodeIfPresent([ConnectedDevice].self, forKey: .devices) ?? []
+        adbConflict = try? c.decodeIfPresent(AdbConflict.self, forKey: .adbConflict)
     }
 
-    enum CodingKeys: String, CodingKey { case ok, error, devices }
+    enum CodingKeys: String, CodingKey { case ok, error, devices, adbConflict }
 }
 
 public struct AppsPayload: Decodable {

@@ -4,6 +4,8 @@ import LogXCore
 @MainActor
 final class LogStore: ObservableObject {
     @Published var devices: [ConnectedDevice] = []
+    @Published var adbConflict: AdbConflict?
+    @Published var adbReclaimInFlight = false
     @Published var apps: [AppProfile] = AppProfile.builtIn
     @Published var selectedSerial: String?
     @Published var selectedAppId: String = "all"
@@ -163,8 +165,10 @@ final class LogStore: ObservableObject {
 
     func refresh(full: Bool = false) async {
         do {
-            let nextDevices = try await client.devices()
+            let deviceState = try await client.deviceState()
+            let nextDevices = deviceState.devices
             if Task.isCancelled { return }
+            if adbConflict != deviceState.adbConflict { adbConflict = deviceState.adbConflict }
             let nextApps = try await client.apps()
             if Task.isCancelled { return }
             let devicesChanged = (nextDevices != devices)

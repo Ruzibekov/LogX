@@ -39,8 +39,15 @@ public struct MonitorClient: Sendable {
     }
 
     public func devices() async throws -> [ConnectedDevice] {
-        let payload: DevicesPayload = try await get("/api/devices")
-        return payload.devices
+        try await deviceState().devices
+    }
+
+    public func deviceState() async throws -> DevicesPayload {
+        try await get("/api/devices")
+    }
+
+    public func reclaimAdb() async throws -> DevicesPayload {
+        try await send("/api/adb/reclaim", method: "POST")
     }
 
     public func apps() async throws -> [AppProfile] {
@@ -105,8 +112,13 @@ public struct MonitorClient: Sendable {
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
+        try await send(path, method: "GET")
+    }
+
+    private func send<T: Decodable>(_ path: String, method: String) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL) else { throw MonitorClientError.decode }
         var req = URLRequest(url: url)
+        req.httpMethod = method
         req.timeoutInterval = 12
         req.cachePolicy = .reloadIgnoringLocalCacheData
         let data: Data
