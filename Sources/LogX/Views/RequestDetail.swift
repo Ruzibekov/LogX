@@ -17,6 +17,7 @@ struct RequestDetail: View {
     @State var treeMatchCount = 0
     @StateObject var shareHost = SharePickerHost()
     @State private var bodyCache: RenderedBody?
+    @State var findCount: FindCount?
 
     var isWrapBody: Bool { wrapBody }
     func toggleWrapBody() { wrapBody.toggle() }
@@ -110,6 +111,9 @@ struct RequestDetail: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
+        }
+        .onChange(of: key) { _, next in
+            findCount = FindCount.snapshot(from: bodyCache, for: next)
         }
         .task(id: key) {
             await render(log: log, key: key)

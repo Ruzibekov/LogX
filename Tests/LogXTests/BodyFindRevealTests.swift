@@ -140,3 +140,55 @@ final class BodyFindRevealTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(far.x + viewport.width, 1540)
     }
 }
+
+@MainActor
+final class FindCountImmediateTests: XCTestCase {
+    private func key(_ logKey: String = "a", query: String, index: Int = 0) -> RenderedBody.Key {
+        RenderedBody.Key(logKey: logKey, tab: .request, redact: false, pretty: true, query: query, index: index, tree: false)
+    }
+
+    private let json = "{\n  \"street\" : \"Navoiy\",\n  \"streets\" : [\"street A\", \"Street B\"],\n  \"city\" : \"Toshkent\"\n}"
+
+    private func rendered(query: String) -> RenderedBody {
+        RenderedBody.make(log: NetworkLog(key: "a", method: "POST", url: "https://x.uz/a", api: "/a", requestBody: json), key: key(query: query))
+    }
+
+    func testCountForNewQueryComesFromCachedBodyWithoutWaitingForRender() {
+        let stale = rendered(query: "stre")
+        XCTAssertEqual(stale.matchCount, 4)
+        let snapshot = FindCount.snapshot(from: stale, for: key(query: "street"))
+        XCTAssertEqual(snapshot?.value, 4)
+        XCTAssertEqual(FindCount.snapshot(from: stale, for: key(query: "streets"))?.value, 1)
+        XCTAssertEqual(FindCount.snapshot(from: stale, for: key(query: "zzz"))?.value, 0)
+        XCTAssertEqual(FindCount.snapshot(from: stale, for: key(query: "  "))?.value, 0)
+    }
+
+    func testImmediateCountMatchesFullRenderCount() {
+        let stale = rendered(query: "")
+        for query in ["s", "st", "Street", "city", "\"", "Navoiy\","] {
+            XCTAssertEqual(FindCount.snapshot(from: stale, for: key(query: query))?.value, rendered(query: query).matchCount, query)
+        }
+    }
+
+    func testCountFromOtherLogIsNotReused() {
+        XCTAssertNil(FindCount.snapshot(from: rendered(query: "stre"), for: key("b", query: "street")))
+        XCTAssertNil(FindCount.snapshot(from: nil, for: key(query: "street")))
+    }
+
+    func testDisplayedCountPrefersFreshSnapshotOverStaleRender() {
+        let stale = rendered(query: "stre")
+        let snapshot = FindCount.snapshot(from: stale, for: key(query: "streets"))
+        XCTAssertEqual(FindCount.display(rendered: stale, snapshot: snapshot, query: "streets"), 1)
+        XCTAssertEqual(FindCount.display(rendered: stale, snapshot: snapshot, query: "stre"), 4)
+        XCTAssertEqual(FindCount.display(rendered: stale, snapshot: nil, query: "streets"), 4)
+        XCTAssertEqual(FindCount.display(rendered: nil, snapshot: snapshot, query: "streets"), 0)
+    }
+
+    func testCountOnLargeBodyIsFastEnoughForKeystroke() {
+        let big = (0..<11_000).map { "\"street_\($0)\" : \"value \($0)\"," }.joined(separator: "\n")
+        XCTAssertEqual(JSONFind.count(big, query: "street_1"), (0..<11_000).filter { String($0).hasPrefix("1") }.count)
+        let start = Date()
+        _ = JSONFind.count(big, query: "value")
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.1)
+    }
+}

@@ -28,7 +28,7 @@ extension RequestDetail {
     func subToolbar(log: NetworkLog, rendered: RenderedBody?, treeAvailable: Bool?) -> some View {
         HStack(spacing: 8) {
             viewModeSegment(treeAvailable: treeAvailable)
-            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : (rendered?.matchCount ?? 0))
+            DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : FindCount.display(rendered: rendered, snapshot: findCount, query: findQuery))
                 .frame(minWidth: 120, maxWidth: 240)
                 .layoutPriority(1)
             Spacer(minLength: 8)

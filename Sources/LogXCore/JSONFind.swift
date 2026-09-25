@@ -24,6 +24,23 @@ public enum JSONFind {
         return out
     }
 
+    public static func count(_ text: String, query: String) -> Int {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !text.isEmpty else { return 0 }
+        var total = 0
+        var search = text.startIndex
+        while search < text.endIndex, let range = text.range(of: q, options: .caseInsensitive, range: search..<text.endIndex) {
+            total += 1
+            guard range.lowerBound < range.upperBound else {
+                guard range.upperBound < text.endIndex else { break }
+                search = text.index(after: range.upperBound)
+                continue
+            }
+            search = range.upperBound
+        }
+        return total
+    }
+
     public static func nextIndex(current: Int, count: Int, reverse: Bool = false) -> Int {
         guard count > 0 else { return 0 }
         let cur = ((current % count) + count) % count
