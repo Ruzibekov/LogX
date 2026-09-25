@@ -74,4 +74,31 @@ final class MethodBadgeTests: XCTestCase {
             XCTAssertGreaterThan(host.fittingSize.width, 200)
         }
     }
+
+    func testFilterBarMethodChipsUseMethodColors() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let bar = try String(contentsOf: root.appendingPathComponent("Sources/LogX/Views/RequestFilterBar.swift"), encoding: .utf8)
+        XCTAssertTrue(bar.contains("let tint = LogXTheme.methodColor(method)"), "filter bar metod chiplari metod rangini olishi kerak")
+        XCTAssertTrue(bar.contains("FilterChipFrame(active: active, tint: tint, idleInk: tint)"), "tanlanmagan chip ham rangli bo'lishi kerak")
+    }
+
+    @MainActor
+    func testFilterBarMethodChipsRender() throws {
+        for (scheme, name) in [(ColorScheme.dark, "dark"), (.light, "light")] {
+            let store = LogStore()
+            store.selectedMethod = "POST"
+            let size = CGSize(width: 1500, height: 110)
+            let view = RequestFilterBar().environmentObject(store)
+                .frame(width: size.width, height: size.height)
+                .environment(\.colorScheme, scheme)
+            let host = NSHostingView(rootView: view)
+            host.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+            host.frame = CGRect(origin: .zero, size: size)
+            host.layoutSubtreeIfNeeded()
+            let rep = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: rep)
+            let dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".screenshots")
+            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("render-filterbar-methods-\(name).png"))
+        }
+    }
 }

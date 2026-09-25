@@ -227,10 +227,11 @@ struct RequestFilterBar: View {
 
     private func methodChip(_ method: String) -> some View {
         let active = store.selectedMethod == method
+        let tint = LogXTheme.methodColor(method)
         return Button { LogXMotion.perform(LogXMotion.snappy) { store.selectMethod(active ? "ALL" : method) } } label: {
             Text(method)
-                .font(LogXType.mono(10.5, active ? .semibold : .medium))
-                .modifier(FilterChipFrame(active: active))
+                .font(LogXType.mono(10.5, active ? .bold : .semibold))
+                .modifier(FilterChipFrame(active: active, tint: tint, idleInk: tint))
         }
         .buttonStyle(LogXPressStyle())
         .help("\(method) so'rovlari")
