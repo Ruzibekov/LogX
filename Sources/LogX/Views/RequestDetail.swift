@@ -59,7 +59,7 @@ struct RequestDetail: View {
 
     private func detail(_ log: NetworkLog) -> some View {
         let key = renderKey(log)
-        let rendered = (bodyCache?.key == key) ? bodyCache : nil
+        let rendered = RenderedBody.displayable(bodyCache, for: key)
         let params = store.redactEnabled ? Redactor.maskParams(log.queryParams) : log.queryParams
         return VStack(alignment: .leading, spacing: 0) {
             DetailHeader(
@@ -98,7 +98,7 @@ struct RequestDetail: View {
                         if let notice = rendered.truncationNotice {
                             truncationStrip(notice)
                         }
-                        BodyTextView(text: rendered.attributed, wrap: wrapBody, activeRange: rendered.activeRange, fontSize: CGFloat(fontSize))
+                        BodyTextView(text: rendered.attributed, wrap: wrapBody, activeRange: rendered.activeRange, fontSize: CGFloat(fontSize), contentID: rendered.key.contentID)
                     }
                     .background(codeWell)
                 } else {

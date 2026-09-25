@@ -79,6 +79,7 @@ final class LineNumberGutter: NSView {
 final class BodyContainerView: NSView {
     let gutter: LineNumberGutter
     let scroll: NSScrollView
+    var pendingReveal: (() -> Void)?
 
     init(scroll: NSScrollView, gutter: LineNumberGutter) {
         self.scroll = scroll
@@ -98,5 +99,9 @@ final class BodyContainerView: NSView {
         gutter.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
         scroll.frame = NSRect(x: width, y: 0, width: max(0, bounds.width - width), height: bounds.height)
         gutter.needsDisplay = true
+        guard let reveal = pendingReveal, bounds.height > 0 else { return }
+        pendingReveal = nil
+        scroll.layoutSubtreeIfNeeded()
+        reveal()
     }
 }

@@ -8,12 +8,14 @@ struct BodyTextView: NSViewRepresentable {
     var wrap: Bool
     var activeRange: NSRange?
     var fontSize: CGFloat = 11.5
+    var contentID: String?
 
     final class Coordinator {
         var lastText: NSAttributedString?
         var lastWrap: Bool?
         var lastActive: NSRange?
         var lastFontSize: CGFloat?
+        var lastContentID: String?
         private var observer: NSObjectProtocol?
 
         func observe(scroll: NSScrollView, gutter: LineNumberGutter) {
@@ -27,6 +29,50 @@ struct BodyTextView: NSViewRepresentable {
             }
         }
 
+        func apply(to view: BodyContainerView, text: NSAttributedString, wrap: Bool, activeRange: NSRange?, fontSize: CGFloat, contentID: String?, animate: Bool) {
+            let scroll = view.scroll
+            guard let textView = scroll.documentView as? NSTextView, let container = textView.textContainer else { return }
+            if lastFontSize != fontSize {
+                lastFontSize = fontSize
+                textView.font = JSONHighlighter.bodyFont(size: fontSize)
+                view.gutter.apply(fontSize: fontSize)
+                lastActive = nil
+            }
+            if lastWrap != wrap {
+                lastWrap = wrap
+                BodyTextView.applyWrap(wrap, textView: textView, container: container, scroll: scroll)
+            }
+            if lastText !== text {
+                lastText = text
+                textView.textStorage?.setAttributedString(text)
+                view.gutter.needsDisplay = true
+                if contentID == nil || contentID != lastContentID {
+                    lastContentID = contentID
+                    lastActive = nil
+                    if activeRange == nil {
+                        textView.scroll(.zero)
+                    }
+                }
+            }
+            guard let activeRange else {
+                lastActive = nil
+                view.pendingReveal = nil
+                return
+            }
+            if lastActive != activeRange, NSMaxRange(activeRange) <= (textView.textStorage?.length ?? 0) {
+                lastActive = activeRange
+                guard scroll.contentView.bounds.height > 0 else {
+                    view.pendingReveal = { [weak textView, weak scroll] in
+                        guard let textView, let scroll else { return }
+                        BodyTextView.reveal(activeRange, textView: textView, scroll: scroll, animate: false, indicate: animate)
+                    }
+                    return
+                }
+                view.pendingReveal = nil
+                BodyTextView.reveal(activeRange, textView: textView, scroll: scroll, animate: animate, indicate: animate)
+            }
+        }
+
         deinit {
             if let observer { NotificationCenter.default.removeObserver(observer) }
         }
@@ -34,7 +80,7 @@ struct BodyTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeNSView(context: Context) -> BodyContainerView {
+    static func makeContainer(fontSize: CGFloat) -> BodyContainerView {
         let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
@@ -60,8 +106,13 @@ struct BodyTextView: NSViewRepresentable {
         scroll.contentView.postsBoundsChangedNotifications = true
 
         let gutter = LineNumberGutter(textView: textView, scroll: scroll, fontSize: fontSize)
-        context.coordinator.observe(scroll: scroll, gutter: gutter)
         return BodyContainerView(scroll: scroll, gutter: gutter)
+    }
+
+    func makeNSView(context: Context) -> BodyContainerView {
+        let view = Self.makeContainer(fontSize: fontSize)
+        context.coordinator.observe(scroll: view.scroll, gutter: view.gutter)
+        return view
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: BodyContainerView, context: Context) -> CGSize? {
@@ -71,46 +122,34 @@ struct BodyTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: BodyContainerView, context: Context) {
-        let scroll = nsView.scroll
-        guard let textView = scroll.documentView as? NSTextView, let container = textView.textContainer else { return }
-        let coord = context.coordinator
-        if coord.lastFontSize != fontSize {
-            coord.lastFontSize = fontSize
-            textView.font = JSONHighlighter.bodyFont(size: fontSize)
-            nsView.gutter.apply(fontSize: fontSize)
+        context.coordinator.apply(
+            to: nsView,
+            text: text,
+            wrap: wrap,
+            activeRange: activeRange,
+            fontSize: fontSize,
+            contentID: contentID,
+            animate: !LogXMotion.reduceMotion
+        )
+    }
+
+    static func applyWrap(_ wrap: Bool, textView: NSTextView, container: NSTextContainer, scroll: NSScrollView) {
+        if wrap {
+            container.widthTracksTextView = true
+            container.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            textView.isHorizontallyResizable = false
+            textView.autoresizingMask = [.width]
+            textView.setFrameSize(NSSize(width: scroll.contentSize.width, height: textView.frame.height))
+            scroll.hasHorizontalScroller = false
+        } else {
+            container.widthTracksTextView = false
+            container.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            container.lineBreakMode = .byClipping
+            textView.isHorizontallyResizable = true
+            textView.autoresizingMask = []
+            scroll.hasHorizontalScroller = true
         }
-        if coord.lastWrap != wrap {
-            coord.lastWrap = wrap
-            if wrap {
-                container.widthTracksTextView = true
-                container.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
-                textView.isHorizontallyResizable = false
-                textView.autoresizingMask = [.width]
-                textView.setFrameSize(NSSize(width: scroll.contentSize.width, height: textView.frame.height))
-                scroll.hasHorizontalScroller = false
-            } else {
-                container.widthTracksTextView = false
-                container.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-                container.lineBreakMode = .byClipping
-                textView.isHorizontallyResizable = true
-                textView.autoresizingMask = []
-                scroll.hasHorizontalScroller = true
-            }
-            textView.layoutManager?.ensureLayout(for: container)
-            textView.sizeToFit()
-        }
-        if coord.lastText !== text {
-            coord.lastText = text
-            textView.textStorage?.setAttributedString(text)
-            nsView.gutter.needsDisplay = true
-            coord.lastActive = nil
-            if activeRange == nil {
-                textView.scroll(.zero)
-            }
-        }
-        if let activeRange, coord.lastActive != activeRange, activeRange.location + activeRange.length <= (textView.textStorage?.length ?? 0) {
-            coord.lastActive = activeRange
-            textView.scrollRangeToVisible(activeRange)
-        }
+        textView.layoutManager?.ensureLayout(for: container)
+        textView.sizeToFit()
     }
 }

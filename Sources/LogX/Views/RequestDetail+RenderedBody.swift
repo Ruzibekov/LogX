@@ -24,6 +24,15 @@ struct RenderedBody {
             self.tree = tree
             self.fontSize = fontSize
         }
+
+        var contentID: String {
+            "\(logKey)|\(tab.rawValue)|\(redact)|\(pretty)|\(tree)"
+        }
+    }
+
+    static func displayable(_ cache: RenderedBody?, for key: Key) -> RenderedBody? {
+        guard let cache, cache.key.contentID == key.contentID else { return nil }
+        return cache
     }
 
     /// Shundan katta tana ekranda qisqartiriladi (nusxa to'liq qoladi) — NSTextView
