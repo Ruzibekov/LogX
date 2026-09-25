@@ -28,15 +28,7 @@ struct RequestRow: View {
         .padding(.horizontal, 14)
         .frame(minHeight: Self.height)
         .background(rowBackground)
-        .overlay(alignment: .leading) {
-            if selected {
-                Rectangle().fill(LogXTheme.accent).frame(width: 3)
-            }
-        }
         .contentShape(Rectangle())
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(LogXTheme.divider).frame(height: 1)
-        }
         .opacity(entered ? 1 : 0)
         .offset(y: entered ? 0 : -LogXMotion.rowInsertOffset)
         .onAppear(perform: enter)
@@ -54,8 +46,7 @@ struct RequestRow: View {
     }
 
     private var rowBackground: Color {
-        if selected { return LogXTheme.selection }
-        return hovered ? LogXTheme.panel2.opacity(0.6) : Color.clear
+        hovered && !selected ? LogXTheme.panel2.opacity(0.6) : Color.clear
     }
 
     private var statusPill: some View {
@@ -210,5 +201,21 @@ enum RowEntrance {
         let seconds = ts > 10_000_000_000 ? ts / 1000 : ts
         let age = now.timeIntervalSince1970 - seconds
         return age >= -window && age < window
+    }
+}
+
+struct RequestRowBackground: View {
+    var selected: Bool
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            selected ? LogXTheme.selection : Color.clear
+            if selected {
+                Rectangle().fill(LogXTheme.accent).frame(width: 3)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(LogXTheme.divider).frame(height: 1)
+        }
     }
 }

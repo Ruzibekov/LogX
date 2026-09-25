@@ -177,4 +177,14 @@ final class OsiloskopRenderTests: XCTestCase {
         let rep = try render(appearance: .darkAqua, name: "osiloskop-narrow", size: CGSize(width: 1100, height: 760))
         XCTAssertGreaterThanOrEqual(rep.pixelsWide, 1100)
     }
+
+    func testSelectedRowBarSitsOnListEdge() throws {
+        let rep = try render(appearance: .darkAqua, name: "osiloskop-dark")
+        let hits = (230...300).filter { y in
+            let c = pixelHex(rep, x: 57, y: y)
+            let r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF
+            return g > 150 && g > r + 40 && g > b + 40
+        }
+        XCTAssertFalse(hits.isEmpty, "selected row accent bar is not flush with the list edge at x=57")
+    }
 }
