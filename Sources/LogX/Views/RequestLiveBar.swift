@@ -9,12 +9,12 @@ struct RequestLiveBar: View {
         HStack(spacing: 8) {
             ConnectionDot(tint: tint, pulsing: store.connection == .live)
             Text(store.connection.title)
-                .font(LogXType.ui(LogXType.meta, .semibold))
+                .font(LogXType.mono(11, .medium))
                 .foregroundStyle(tint)
                 .fixedSize(horizontal: true, vertical: false)
             Text(summary)
-                .font(LogXType.mono(LogXType.meta))
-                .foregroundStyle(LogXTheme.muted2)
+                .font(LogXType.mono(11))
+                .foregroundStyle(LogXTheme.muted)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 12)
@@ -26,10 +26,10 @@ struct RequestLiveBar: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background(LogXTheme.panel)
+        .frame(minHeight: 28)
+        .background(LogXTheme.chrome)
         .overlay(alignment: .top) { Rectangle().fill(LogXTheme.line).frame(height: 1) }
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.connection)
+        .animation(LogXMotion.settle, value: store.connection)
     }
 
     private var hints: some View {
@@ -54,8 +54,8 @@ struct RequestLiveBar: View {
         HStack(spacing: 5) {
             ShortcutGlyph(parts: parts)
             Text(label)
-                .font(LogXType.ui(LogXType.caption))
-                .foregroundStyle(LogXTheme.muted2)
+                .font(LogXType.mono(10.5))
+                .foregroundStyle(LogXTheme.muted)
                 .fixedSize(horizontal: true, vertical: false)
         }
     }

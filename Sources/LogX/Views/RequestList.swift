@@ -20,6 +20,7 @@ struct RequestList: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            LatencyTimelineView()
             RequestFilterBar()
             Divider().overlay(LogXTheme.divider)
             if let banner = store.banner, !store.visibleLogs.isEmpty {
@@ -50,7 +51,7 @@ struct RequestList: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.toast)
+        .animation(LogXMotion.settle, value: store.toast)
         .onReceive(ticker) { now = $0 }
     }
 
@@ -58,11 +59,11 @@ struct RequestList: View {
         let command = text.split(separator: "—").map { $0.trimmingCharacters(in: .whitespaces) }.first(where: { $0.hasPrefix("bash ") })
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10.5, weight: .semibold))
-            Text(text).font(.system(size: 11, weight: .medium)).lineLimit(2).textSelection(.enabled)
+            Text(text).font(LogXType.ui(11.5, .medium)).lineLimit(2).textSelection(.enabled)
             Spacer(minLength: 4)
             if let command {
                 Button("Buyruqni nusxalash") { store.copy(command, what: "buyruq") }
-                    .buttonStyle(.plain).font(.system(size: 11, weight: .semibold)).foregroundStyle(LogXTheme.accentLight)
+                    .buttonStyle(.plain).font(LogXType.ui(11.5, .semibold)).foregroundStyle(LogXTheme.accentLight)
             }
             Button { store.dismissBanner() } label: {
                 Image(systemName: "xmark").font(.system(size: 9.5, weight: .bold)).foregroundStyle(LogXTheme.muted).padding(4)
@@ -102,7 +103,6 @@ struct RequestList: View {
 
     private var list: some View {
         VStack(spacing: 0) {
-            LatencyTimelineView()
             ScrollViewReader { proxy in
                 List(ListGrouping.rows(store.visibleLogs)) { row in
                     switch row {
@@ -129,7 +129,7 @@ struct RequestList: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .environment(\.defaultMinListRowHeight, 52)
+                .environment(\.defaultMinListRowHeight, RequestRow.height)
                 .focusable()
                 .focusEffectDisabled()
                 .focused($listFocused)
@@ -216,16 +216,15 @@ struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(toast.text).font(.system(size: 11.5, weight: .medium)).foregroundStyle(LogXTheme.text).lineLimit(1)
+            Text(toast.text).font(LogXType.ui(12, .medium)).foregroundStyle(LogXTheme.text).lineLimit(1)
             if let title = toast.actionTitle, let action = toast.action {
                 Button(title) { action(); dismiss() }
-                    .buttonStyle(.plain).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(LogXTheme.accentLight)
+                    .buttonStyle(.plain).font(LogXType.ui(12, .semibold)).foregroundStyle(LogXTheme.accentLight)
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(LogXTheme.panel2, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
-        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+        .background(LogXTheme.panel2, in: RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
         .onTapGesture(perform: dismiss)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)

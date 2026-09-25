@@ -168,9 +168,10 @@ final class ThemeAndSelectionTests: XCTestCase {
         }
         let share = try source("Sources/LogX/ShareCardRenderer.swift")
         XCTAssertFalse(share.contains("srgbRed:"), "share card must use the app palette")
-        XCTAssertTrue(share.contains("NSColor(rgbHex: 0x1FB6D4)"), share)
+        XCTAssertTrue(share.contains("NSColor(rgbHex: 0x3FCF6E)"), share)
         let theme = try source("Sources/LogX/Theme.swift")
-        XCTAssertTrue(theme.contains("case .redirect3xx: return text2"), "3xx must not borrow the interactive accent")
+        XCTAssertTrue(theme.contains("case .redirect3xx: return .neutral"), "3xx must not borrow the interactive accent")
+        XCTAssertTrue(theme.contains("case .neutral: return LogXPalette.text2"), theme)
     }
 
     func testListKeyboardAndFollowScrollGuards() throws {

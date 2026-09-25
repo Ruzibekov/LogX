@@ -18,11 +18,11 @@ struct ShortcutGlyph: View {
                         .font(.system(size: compact ? 8 : 9, weight: .bold))
                 case .letter(let text):
                     Text(text)
-                        .font(.system(size: compact ? 9 : 9.5, weight: .semibold))
+                        .font(LogXType.mono(compact ? 8.5 : 9, .semibold))
                 }
             }
         }
-        .foregroundStyle(LogXTheme.muted2)
+        .foregroundStyle(LogXTheme.muted)
         .padding(.horizontal, compact ? 4.5 : 5)
         .padding(.vertical, compact ? 2 : 2.5)
         .background(LogXTheme.well, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
@@ -51,13 +51,10 @@ struct LogXPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
-            .animation(
-                reduceMotion
-                    ? nil
-                    : .spring(response: 0.16, dampingFraction: 0.72),
-                value: configuration.isPressed
-            )
+        let reduce = reduceMotion || LogXMotion.reduceMotion
+        return configuration.label
+            .scaleEffect(reduce ? 1 : (configuration.isPressed ? LogXMotion.pressScale : 1))
+            .opacity(configuration.isPressed ? 0.86 : 1)
+            .animation(LogXMotion.press(reduce: reduce), value: configuration.isPressed)
     }
 }

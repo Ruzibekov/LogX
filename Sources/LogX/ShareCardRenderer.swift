@@ -13,9 +13,9 @@ enum ShareCardRenderer {
         let caption = ShareCardRenderer.header(subject, redact: redact)
         let width: CGFloat = 920
         let pad: CGFloat = 28
-        let mono = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-        let titleFont = NSFont.systemFont(ofSize: 15, weight: .semibold)
-        let small = NSFont.systemFont(ofSize: 11, weight: .medium)
+        let mono = LogXFonts.nsMono(12.5)
+        let titleFont = LogXFonts.nsMono(15, .semibold)
+        let small = LogXFonts.nsUI(11.5, .medium)
 
         let attrBody = NSMutableAttributedString()
         for span in spans {
@@ -27,7 +27,7 @@ enum ShareCardRenderer {
         if attrBody.length == 0 {
             attrBody.append(NSAttributedString(string: "—", attributes: [
                 .font: mono,
-                .foregroundColor: NSColor(rgbHex: 0x8C919B),
+                .foregroundColor: NSColor(rgbHex: LogXPalette.text2.dark),
             ]))
         }
 
@@ -39,27 +39,27 @@ enum ShareCardRenderer {
         let size = NSSize(width: width, height: height)
         let image = NSImage(size: size)
         image.lockFocus()
-        NSColor(rgbHex: 0x0C0E11).setFill()
+        NSColor(rgbHex: LogXPalette.bg.dark).setFill()
         NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
 
-        NSColor(rgbHex: 0x1FB6D4).setFill()
+        NSColor(rgbHex: 0x3FCF6E).setFill()
         NSBezierPath(rect: NSRect(x: 0, y: 0, width: 4, height: size.height)).fill()
 
         let title = NSAttributedString(string: caption.title, attributes: [
             .font: titleFont,
-            .foregroundColor: NSColor(rgbHex: 0xECEFF3),
+            .foregroundColor: NSColor(rgbHex: LogXPalette.text.dark),
         ])
         title.draw(at: NSPoint(x: pad, y: size.height - 40))
 
         let meta = NSAttributedString(string: caption.meta, attributes: [
             .font: small,
-            .foregroundColor: NSColor(rgbHex: 0x8C919B),
+            .foregroundColor: NSColor(rgbHex: LogXPalette.text2.dark),
         ])
         meta.draw(in: NSRect(x: pad, y: size.height - 78, width: width - pad * 2, height: 32))
 
         let tabTitle = NSAttributedString(string: tab.title.uppercased(), attributes: [
-            .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-            .foregroundColor: NSColor(rgbHex: 0x63D3E8),
+            .font: LogXFonts.nsMono(10, .semibold),
+            .foregroundColor: NSColor(rgbHex: LogXPalette.accentLight.dark),
             .kern: 1.1,
         ])
         tabTitle.draw(at: NSPoint(x: pad, y: size.height - 104))
@@ -72,8 +72,8 @@ enum ShareCardRenderer {
         ), options: [.usesLineFragmentOrigin, .usesFontLeading])
 
         let brand = NSAttributedString(string: redact ? "LogX · yashirilgan" : "LogX", attributes: [
-            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: NSColor(rgbHex: 0x8C919B),
+            .font: LogXFonts.nsUI(11, .semibold),
+            .foregroundColor: NSColor(rgbHex: LogXPalette.text2.dark),
         ])
         brand.draw(at: NSPoint(x: pad, y: 14))
         image.unlockFocus()
@@ -109,6 +109,6 @@ enum ShareCardRenderer {
     }
 
     private static func color(_ kind: JSONSpanKind) -> NSColor {
-        JSONHighlighter.nsColor(kind)
+        NSColor(rgbHex: JSONHighlighter.hex(kind).dark)
     }
 }

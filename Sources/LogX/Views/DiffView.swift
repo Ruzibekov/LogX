@@ -119,7 +119,7 @@ struct DiffView: View {
         HStack(spacing: 5) {
             ForEach(LogDiff.Section.allCases, id: \.self) { item in
                 Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { section = item }
+                    LogXMotion.perform(LogXMotion.snappy) { section = item }
                 } label: {
                     Text(item.title)
                         .font(LogXType.ui(LogXType.body, section == item ? .semibold : .medium))
@@ -243,9 +243,9 @@ struct RenderedDiff {
         return RenderedDiff(diff: diff, lines: lines, attributed: attributed(lines), unified: TextDiff.unified(lines))
     }
 
-    static let insertBg = LogXTheme.dynamicNS(dark: 0x2FBF71, light: 0x1A7A44).withAlphaComponent(0.16)
-    static let deleteBg = LogXTheme.dynamicNS(dark: 0xE5534B, light: 0xC0392F).withAlphaComponent(0.16)
-    static let changedFg = LogXTheme.dynamicNS(dark: 0xECEFF3, light: 0x141821)
+    static let insertBg = LogXTheme.dynamicNS(LogXPalette.ok).withAlphaComponent(0.16)
+    static let deleteBg = LogXTheme.dynamicNS(LogXPalette.err).withAlphaComponent(0.16)
+    static let changedFg = LogXTheme.dynamicNS(LogXPalette.text)
 
     static func pad(_ n: Int?) -> String {
         let s = n.map(String.init) ?? ""
@@ -255,7 +255,7 @@ struct RenderedDiff {
     static func attributed(_ lines: [DiffLine]) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let font = JSONHighlighter.bodyFont
-        let gutterFont = NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular)
+        let gutterFont = LogXFonts.nsMono(10.5)
         for (i, line) in lines.enumerated() {
             let prefix: String
             let color: NSColor

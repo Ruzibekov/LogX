@@ -27,9 +27,9 @@ final class LineNumberGutter: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        LogXTheme.dynamicNS(dark: 0x0A0C0F, light: 0xF2F5F9).setFill()
+        LogXTheme.dynamicNS(LogXPalette.well).setFill()
         bounds.fill()
-        LogXTheme.dynamicNS(dark: 0x1B1F25, light: 0xE7EBF0).setFill()
+        LogXTheme.dynamicNS(LogXPalette.well).setFill()
         NSRect(x: bounds.maxX - 1, y: 0, width: 1, height: bounds.height).fill()
 
         guard let textView,
@@ -53,8 +53,8 @@ final class LineNumberGutter: NSView {
         }
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: max(9, fontSize - 1.5), weight: .regular),
-            .foregroundColor: LogXTheme.dynamicNS(dark: 0x4C545F, light: 0x737C89),
+            .font: LogXFonts.nsMono(max(9, fontSize - 1.5)),
+            .foregroundColor: LogXTheme.dynamicNS(LogXPalette.muted2),
         ]
 
         var index = charRange.location

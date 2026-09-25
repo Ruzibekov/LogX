@@ -79,7 +79,7 @@ struct JSONTreeView: View {
             collapsed.subtract(ancestors)
         }
         DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.18)) {
+            LogXMotion.perform(LogXMotion.expand) {
                 proxy.scrollTo(id, anchor: .center)
             }
         }
@@ -112,7 +112,7 @@ struct JSONTreeView: View {
                 Image(systemName: icon)
                     .font(.system(size: 9, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(LogXType.ui(11, .medium))
             }
             .foregroundStyle(LogXTheme.muted)
         }
@@ -123,7 +123,7 @@ struct JSONTreeView: View {
     private func toggle(_ node: JSONNode, deep: Bool) {
         guard node.kind.isContainer, node.childCount > 0 else { return }
         let ids = deep ? tree.subtreeContainerIDs(of: node.id) : [node.id]
-        withAnimation(.easeOut(duration: 0.12)) {
+        LogXMotion.perform(LogXMotion.hover) {
             if collapsed.contains(node.id) {
                 collapsed.subtract(ids)
             } else {
@@ -178,7 +178,7 @@ private struct JSONTreeRow<Menu: View>: View {
             }
             if node.depth > 0 {
                 Text(node.key)
-                    .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                    .font(LogXType.mono(11.5, .medium))
                     .foregroundStyle(node.key.hasPrefix("[") ? LogXTheme.muted : JSONHighlighter.spanColor(.key))
                     .lineLimit(1)
                     .layoutPriority(1)
@@ -228,7 +228,7 @@ private struct JSONTreeRow<Menu: View>: View {
                 .foregroundStyle(JSONHighlighter.spanColor(.punct))
             if node.childCount > 0 {
                 Text("\(node.childCount) ta")
-                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                    .font(LogXType.mono(9.5, .semibold))
                     .foregroundStyle(LogXTheme.muted2)
                     .fixedSize()
                     .padding(.horizontal, 4.5)

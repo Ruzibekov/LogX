@@ -2,38 +2,114 @@ import AppKit
 import SwiftUI
 import LogXCore
 
+struct LogXHexPair: Equatable, Sendable {
+    let dark: Int
+    let light: Int
+
+    func hex(isDark: Bool) -> Int { isDark ? dark : light }
+}
+
+enum LogXPalette {
+    static let bg = LogXHexPair(dark: 0x0D1012, light: 0xEEF1EF)
+    static let panel = LogXHexPair(dark: 0x13171A, light: 0xF6F8F6)
+    static let panel2 = LogXHexPair(dark: 0x1A2024, light: 0xE2E7E3)
+    static let well = LogXHexPair(dark: 0x090B0C, light: 0xF3F6F4)
+    static let line = LogXHexPair(dark: 0x1E252A, light: 0xCFD8D2)
+    static let divider = LogXHexPair(dark: 0x161B1F, light: 0xE1E7E3)
+    static let chrome = LogXHexPair(dark: 0x0A0C0E, light: 0xE6EBE7)
+
+    static let text = LogXHexPair(dark: 0xE4EAE6, light: 0x0E1411)
+    static let text2 = LogXHexPair(dark: 0xA9B4AD, light: 0x36433B)
+    static let muted = LogXHexPair(dark: 0x6B7770, light: 0x5D6A62)
+    static let muted2 = LogXHexPair(dark: 0x4F5C55, light: 0x7C8981)
+
+    static let accent = LogXHexPair(dark: 0x3FCF6E, light: 0x16873F)
+    static let onAccent = LogXHexPair(dark: 0x04140A, light: 0xF4FBF6)
+    static let accentLight = LogXHexPair(dark: 0x7BE09C, light: 0x16873F)
+    static let ok = LogXHexPair(dark: 0x3FCF6E, light: 0x16873F)
+    static let warn = LogXHexPair(dark: 0xE9B949, light: 0x9A6A00)
+    static let err = LogXHexPair(dark: 0xF2685F, light: 0xC2362D)
+    static let replay = LogXHexPair(dark: 0x9C8CF0, light: 0x6B5BD0)
+    static let barTrack = LogXHexPair(dark: 0x1E2A24, light: 0xC9D6CD)
+
+    static let jsonKey = LogXHexPair(dark: 0x9FE8B8, light: 0x0F6B34)
+    static let jsonString = LogXHexPair(dark: 0xE4EAE6, light: 0x0E1411)
+    static let jsonNumber = LogXHexPair(dark: 0xE9B949, light: 0x8A5A00)
+    static let jsonBoolNull = LogXHexPair(dark: 0xF2685F, light: 0xB42318)
+    static let jsonPunct = LogXHexPair(dark: 0x4F5C55, light: 0x6B7770)
+    static let jsonPlain = LogXHexPair(dark: 0xE4EAE6, light: 0x0E1411)
+}
+
+enum LogXRadius {
+    static let control: CGFloat = 6
+    static let chip: CGFloat = 5
+    static let avatar: CGFloat = 10
+}
+
+enum StatusTone: Equatable {
+    case accent
+    case warn
+    case err
+    case neutral
+    case muted
+    case text
+
+    static func of(_ cls: LogXCore.StatusClass) -> StatusTone {
+        switch cls {
+        case .ok2xx: return .accent
+        case .redirect3xx: return .neutral
+        case .err4xx: return .warn
+        case .err5xx: return .err
+        case .net: return .muted
+        case .all: return .text
+        }
+    }
+
+    var hex: LogXHexPair {
+        switch self {
+        case .accent: return LogXPalette.ok
+        case .warn: return LogXPalette.warn
+        case .err: return LogXPalette.err
+        case .neutral: return LogXPalette.text2
+        case .muted: return LogXPalette.muted
+        case .text: return LogXPalette.text
+        }
+    }
+}
+
 enum LogXTheme {
-    static let bg = dynamic(dark: 0x0C0E11, light: 0xEFF2F6)
-    static let panel = dynamic(dark: 0x131619, light: 0xF8FAFC)
-    static let panel2 = dynamic(dark: 0x181C21, light: 0xE7ECF2)
-    static let well = dynamic(dark: 0x0A0C0F, light: 0xF2F5F9)
-    static let line = dynamic(dark: 0x23282F, light: 0xDDE2E8)
-    static let divider = dynamic(dark: 0x1B1F25, light: 0xE7EBF0)
+    static let bg = color(LogXPalette.bg)
+    static let panel = color(LogXPalette.panel)
+    static let panel2 = color(LogXPalette.panel2)
+    static let well = color(LogXPalette.well)
+    static let line = color(LogXPalette.line)
+    static let divider = color(LogXPalette.divider)
+    static let chrome = color(LogXPalette.chrome)
+    static let chromeNS = dynamicNS(LogXPalette.chrome)
 
-    static let text = dynamic(dark: 0xECEFF3, light: 0x141821)
-    static let text2 = dynamic(dark: 0xA7B0BC, light: 0x3F4855)
-    static let muted = dynamic(dark: 0x6E7885, light: 0x59626F)
-    static let muted2 = dynamic(dark: 0x4C545F, light: 0x737C89)
+    static let text = color(LogXPalette.text)
+    static let text2 = color(LogXPalette.text2)
+    static let muted = color(LogXPalette.muted)
+    static let muted2 = color(LogXPalette.muted2)
 
-    static let accent = dynamic(dark: 0x1FB6D4, light: 0x0A6073)
-    static let onAccent = dynamic(dark: 0x06222A, light: 0xF8FAFC)
-    static let accentLight = dynamic(dark: 0x63D3E8, light: 0x0A6073)
-    static let ok = dynamic(dark: 0x2FBF71, light: 0x1A7A44)
-    static let warn = dynamic(dark: 0xE0A23C, light: 0xA96B0C)
-    static let err = dynamic(dark: 0xE5534B, light: 0xC0392F)
-    static let replay = dynamic(dark: 0x8D7BEA, light: 0x6B5BD0)
-    static let barTrack = dynamic(dark: 0x2B424D, light: 0xB7C4D0)
+    static let accent = color(LogXPalette.accent)
+    static let onAccent = color(LogXPalette.onAccent)
+    static let accentLight = color(LogXPalette.accentLight)
+    static let ok = color(LogXPalette.ok)
+    static let warn = color(LogXPalette.warn)
+    static let err = color(LogXPalette.err)
+    static let replay = color(LogXPalette.replay)
+    static let barTrack = color(LogXPalette.barTrack)
 
     static let method = text2
     static let net = muted
 
-    static let selection = accent.opacity(0.10)
-    static let selectionEdge = accent.opacity(0.32)
-    static let chipOn = accent.opacity(0.14)
+    static let selection = accent.opacity(0.07)
+    static let selectionEdge = accent
+    static let chipOn = accent.opacity(0.12)
     static let chipOnEdge = accent.opacity(0.45)
     static let focusRing = accent.opacity(0.75)
 
-    /// Metod rang bilan emas, vazn bilan ajratiladi; faqat DELETE ogohlantiradi.
     static func methodColor(_ method: String) -> Color {
         switch method.uppercased() {
         case "DELETE": return err
@@ -43,18 +119,15 @@ enum LogXTheme {
     }
 
     static func status(_ cls: LogXCore.StatusClass) -> Color {
-        switch cls {
-        case .ok2xx: return ok
-        case .redirect3xx: return text2
-        case .err4xx: return warn
-        case .err5xx: return err
-        case .net: return net
-        case .all: return text
-        }
+        color(StatusTone.of(cls).hex)
     }
 
     static func statusTint(_ cls: LogXCore.StatusClass) -> Color {
-        status(cls).opacity(0.13)
+        status(cls).opacity(0.12)
+    }
+
+    static func dynamicNS(_ pair: LogXHexPair) -> NSColor {
+        dynamicNS(dark: pair.dark, light: pair.light)
     }
 
     static func dynamicNS(dark: Int, light: Int) -> NSColor {
@@ -64,24 +137,31 @@ enum LogXTheme {
         }
     }
 
+    static func color(_ pair: LogXHexPair) -> Color {
+        Color(nsColor: dynamicNS(pair))
+    }
+
     static func dynamic(dark: Int, light: Int) -> Color {
         Color(nsColor: dynamicNS(dark: dark, light: light))
     }
 }
 
-enum LogXType {
-    static let caption: CGFloat = 10
-    static let meta: CGFloat = 12
-    static let body: CGFloat = 13
-    static let title: CGFloat = 14
-    static let display: CGFloat = 22
-
-    static func ui(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font {
-        .system(size: size, weight: weight)
+enum LogXContrast {
+    static func luminance(_ hex: Int) -> Double {
+        func channel(_ value: Int) -> Double {
+            let c = Double(value) / 255
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let r = channel((hex >> 16) & 0xFF)
+        let g = channel((hex >> 8) & 0xFF)
+        let b = channel(hex & 0xFF)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
 
-    static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
+    static func ratio(_ a: Int, _ b: Int) -> Double {
+        let la = luminance(a)
+        let lb = luminance(b)
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
 }
 
@@ -101,10 +181,8 @@ struct ConnectionDot: View {
     var pulsing: Bool
 
     var body: some View {
-        Image(systemName: pulsing ? "bolt.horizontal.circle.fill" : "circle")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(tint)
-            .frame(width: 14, height: 14)
+        LiveDot(tint: tint, pulsing: pulsing, size: 6)
+            .frame(width: 10, height: 10)
             .accessibilityHidden(true)
     }
 }

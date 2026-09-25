@@ -13,13 +13,14 @@ extension RequestDetail {
 
     @ViewBuilder
     func tabBar(log: NetworkLog, treeAvailable: Bool?) -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 22) {
             tabButtons(log: log)
             Spacer(minLength: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .background(LogXTheme.panel)
+        .frame(height: 42)
+        .padding(.horizontal, 22)
+        .background(LogXTheme.bg)
         .overlay(alignment: .bottom) { Rectangle().fill(LogXTheme.line).frame(height: 1) }
     }
 
@@ -28,22 +29,23 @@ extension RequestDetail {
         HStack(spacing: 8) {
             viewModeSegment(treeAvailable: treeAvailable)
             DetailFindBar(query: $findQuery, index: $findIndex, matchCount: rendered?.tree != nil ? treeMatchCount : (rendered?.matchCount ?? 0))
-                .frame(maxWidth: 320)
+                .frame(minWidth: 210, maxWidth: 240)
             Spacer(minLength: 8)
             Text(bodyMeta(log: log, rendered: rendered))
                 .font(LogXType.mono(LogXType.caption))
-                .foregroundStyle(LogXTheme.muted2)
+                .foregroundStyle(LogXTheme.muted)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(bodyMeta(log: log, rendered: rendered))
             if tab == .request || tab == .response {
                 zoomControls
             }
             copyBodyButton(log: log)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 22)
+        .frame(minHeight: 40)
         .background(LogXTheme.well)
-        .overlay(alignment: .bottom) { Rectangle().fill(LogXTheme.line).frame(height: 1) }
+        .overlay(alignment: .bottom) { Rectangle().fill(LogXTheme.divider).frame(height: 1) }
     }
 
     func bodyMeta(log: NetworkLog, rendered: RenderedBody?) -> String {
@@ -63,7 +65,7 @@ extension RequestDetail {
     func viewModeSegment(treeAvailable: Bool?) -> some View {
         switch tab {
         case .request, .response:
-            HStack(spacing: 2) {
+            HStack(spacing: 0) {
                 segmentButton("Daraxt", active: treeBody, help: treeAvailable == false && treeBody
                     ? "Tana JSON emas yoki \(JSONTree.nodeLimit) tugundan katta — matn ko'rsatilmoqda"
                     : "JSON'ni yig'iladigan daraxt sifatida ko'rsatish (⌥-bosish butun shoxni yig'adi)") {
@@ -78,11 +80,10 @@ extension RequestDetail {
                     prettyBody = false
                 }
             }
-            .padding(2)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.panel2))
+            .modifier(SegmentFrame())
             wrapButton
         case .headers:
-            HStack(spacing: 2) {
+            HStack(spacing: 0) {
                 segmentButton("Jadval", active: headersTableView, help: "Strukturali jadval ko'rinishi") {
                     headersTableView = true
                 }
@@ -90,8 +91,7 @@ extension RequestDetail {
                     headersTableView = false
                 }
             }
-            .padding(2)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.panel2))
+            .modifier(SegmentFrame())
             wrapButton
         case .params:
             EmptyView()
@@ -100,15 +100,19 @@ extension RequestDetail {
 
     var wrapButton: some View {
         Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { toggleWrapBody() }
+            LogXMotion.perform(LogXMotion.snappy) { toggleWrapBody() }
         } label: {
             Image(systemName: isWrapBody ? "text.alignleft" : "arrow.left.and.right")
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(isWrapBody ? LogXTheme.accent : LogXTheme.muted)
                 .frame(width: 28, height: 26)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isWrapBody ? LogXTheme.chipOn : LogXTheme.panel2)
+                    RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
+                        .fill(isWrapBody ? LogXTheme.chipOn : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
+                        .stroke(isWrapBody ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1)
                 )
         }
         .buttonStyle(LogXPressStyle())
@@ -125,15 +129,11 @@ extension RequestDetail {
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 10, weight: .semibold))
                 Text(copied ? "Nusxalandi" : "Nusxa")
-                    .font(LogXType.ui(LogXType.meta, .semibold))
+                    .font(LogXType.ui(LogXType.meta, .medium))
             }
             .foregroundStyle(copied ? LogXTheme.ok : LogXTheme.text2)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(LogXTheme.panel2))
         }
-        .buttonStyle(LogXPressStyle())
+        .buttonStyle(LogXButtonStyle(kind: .outline, height: 28, horizontalPadding: 10))
         .keyboardShortcut("c", modifiers: [.option, .command])
         .help("Tanani nusxalash (⌥⌘C)")
         .accessibilityLabel("Tanani nusxalash")
@@ -141,19 +141,16 @@ extension RequestDetail {
 
     func segmentButton(_ title: String, active: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { action() }
+            LogXMotion.perform(LogXMotion.snappy) { action() }
         } label: {
             Text(title)
                 .font(LogXType.ui(LogXType.meta, active ? .semibold : .medium))
-                .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
+                .foregroundStyle(active ? LogXTheme.text : LogXTheme.text2)
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 10)
-                .frame(height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(active ? LogXTheme.panel : Color.clear)
-                )
+                .frame(height: 24)
+                .background(active ? LogXTheme.panel2 : Color.clear)
         }
         .buttonStyle(LogXPressStyle())
         .help(help)
@@ -163,14 +160,17 @@ extension RequestDetail {
     func tabButtons(log: NetworkLog) -> some View {
         ForEach(DetailTab.allCases, id: \.self) { item in
             Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                LogXMotion.perform(LogXMotion.snappy) {
                     store.detailTab = item
                 }
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     Text(item.title)
                         .font(LogXType.ui(LogXType.body, tab == item ? .semibold : .medium))
                         .lineLimit(1)
+                    Text("⌘\(String(tabShortcut(item).character))")
+                        .font(LogXType.mono(9.5))
+                        .foregroundStyle(LogXTheme.muted)
                     if item == .params && !log.queryParams.isEmpty {
                         Text("\(log.queryParams.count)")
                             .font(LogXType.mono(LogXType.caption, .bold))
@@ -184,10 +184,9 @@ extension RequestDetail {
                     }
                 }
                 .fixedSize(horizontal: true, vertical: false)
-                .padding(.horizontal, 4)
-                .padding(.top, 5)
-                .padding(.bottom, 6)
+                .frame(maxHeight: .infinity)
                 .foregroundStyle(tab == item ? LogXTheme.text : LogXTheme.muted)
+                .contentShape(Rectangle())
                 .overlay(alignment: .bottom) {
                     Rectangle()
                         .fill(tab == item ? LogXTheme.accent : Color.clear)
@@ -256,5 +255,14 @@ extension RequestDetail {
         case .headers: return "3"
         case .params: return "4"
         }
+    }
+}
+
+struct SegmentFrame: ViewModifier {
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
+        return content
+            .clipShape(shape)
+            .overlay(shape.stroke(LogXTheme.line, lineWidth: 1))
     }
 }

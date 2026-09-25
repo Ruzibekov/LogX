@@ -38,7 +38,7 @@ struct RequestDetail: View {
                 noSelectionPlaceholder
             }
         }
-        .background(LogXTheme.panel)
+        .background(LogXTheme.bg)
     }
 
     /// Daraxt rejimida topish so'rovi kalitga kirmaydi — har harfda daraxt qayta
@@ -92,8 +92,7 @@ struct RequestDetail: View {
                 } else if let rendered, let tree = rendered.tree {
                     JSONTreeView(tree: tree, query: findQuery, activeIndex: findIndex) { treeMatchCount = $0 }
                         .id(tree.identity)
-                        .background(bodyWell)
-                        .padding(10)
+                        .background(codeWell)
                 } else if let rendered {
                     VStack(spacing: 0) {
                         if let notice = rendered.truncationNotice {
@@ -101,8 +100,7 @@ struct RequestDetail: View {
                         }
                         BodyTextView(text: rendered.attributed, wrap: wrapBody, activeRange: rendered.activeRange, fontSize: CGFloat(fontSize))
                     }
-                    .background(bodyWell)
-                    .padding(10)
+                    .background(codeWell)
                 } else {
                     ProgressView()
                         .controlSize(.small)

@@ -7,17 +7,17 @@ extension RequestDetail {
             Image(systemName: "eye.slash")
                 .font(.system(size: 10.5, weight: .semibold))
             Text("Bu so'rov joriy filtr bilan ro'yxatda ko'rinmaydi")
-                .font(.system(size: 11, weight: .medium))
+                .font(LogXType.ui(11.5, .medium))
                 .lineLimit(1)
             Spacer(minLength: 4)
             Button("Filtrlarni tozalash") {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                LogXMotion.perform(LogXMotion.settle) {
                     store.clearFilters()
                 }
             }
             .buttonStyle(.plain)
             .fixedSize(horizontal: true, vertical: false)
-            .font(.system(size: 11, weight: .semibold))
+            .font(LogXType.ui(11.5, .semibold))
             .foregroundStyle(LogXTheme.accentLight)
         }
         .foregroundStyle(LogXTheme.warn)
@@ -32,23 +32,27 @@ extension RequestDetail {
             Image(systemName: "scissors")
                 .font(.system(size: 10, weight: .semibold))
             Text(notice)
-                .font(.system(size: 10.5, weight: .medium))
+                .font(LogXType.ui(11, .medium))
             Spacer(minLength: 0)
         }
         .foregroundStyle(LogXTheme.muted)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(LogXTheme.panel2)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8))
+        .clipShape(Rectangle())
     }
 
     var bodyWell: some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
+        RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
             .fill(LogXTheme.well)
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
                     .stroke(LogXTheme.line, lineWidth: 1)
             )
+    }
+
+    var codeWell: some View {
+        Rectangle().fill(LogXTheme.well)
     }
 
     var noSelectionPlaceholder: some View {
@@ -57,11 +61,11 @@ extension RequestDetail {
                 .font(.system(size: 32))
                 .foregroundStyle(LogXTheme.muted2)
             Text("So'rov tanlang")
-                .font(.system(size: 14, weight: .medium))
+                .font(LogXType.ui(LogXType.title, .medium))
                 .foregroundStyle(LogXTheme.muted)
             Text("↑↓ bilan yuring, ⌘F qidiradi")
                 .font(LogXType.ui(LogXType.meta))
-                .foregroundStyle(LogXTheme.muted2)
+                .foregroundStyle(LogXTheme.muted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

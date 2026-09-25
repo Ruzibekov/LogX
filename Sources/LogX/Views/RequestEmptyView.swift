@@ -95,7 +95,7 @@ struct RequestEmptyView: View {
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.connection)
+        .animation(LogXMotion.settle, value: store.connection)
         .transition(.opacity)
     }
 
@@ -108,7 +108,7 @@ struct RequestEmptyView: View {
 
     private var undoClearButton: some View {
         primaryCTA(icon: "arrow.uturn.backward", title: "Tozalashni bekor qilish") {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            LogXMotion.perform(LogXMotion.settle) {
                 store.undoClear()
             }
         }
@@ -164,7 +164,7 @@ struct RequestEmptyView: View {
             subtitle: "Jami \(store.logCount) ta jonli — boshqa ilova yoki status."
         ) {
             primaryCTA(icon: "arrow.counterclockwise", title: "Filtrlarni tozalash") {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                LogXMotion.perform(LogXMotion.settle) {
                     store.clearFilters()
                 }
             }
@@ -181,7 +181,7 @@ struct RequestEmptyView: View {
             subtitle: "\(store.noiseHiddenCount) ta so'rov analitika/health sifatida yashirilgan."
         ) {
             primaryCTA(icon: "eye", title: "Shovqinni ko'rsatish") {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                LogXMotion.perform(LogXMotion.settle) {
                     store.toggleHideNoise()
                 }
             }

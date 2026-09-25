@@ -26,10 +26,10 @@ enum JSONHighlighter {
         }
 
         var result = AttributedString()
-        result.font = .system(size: 11.5, design: .monospaced)
+        result.font = LogXType.mono(11.5)
         for span in spans {
             var piece = AttributedString(span.text)
-            piece.font = .system(size: 11.5, design: .monospaced)
+            piece.font = LogXType.mono(11.5)
             piece.foregroundColor = spanColor(span.kind)
             result.append(piece)
         }
@@ -47,7 +47,7 @@ enum JSONHighlighter {
     }
 
     static func bodyFont(size: CGFloat = 11.5) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        LogXFonts.nsMono(size)
     }
     static var bodyFont: NSFont { bodyFont(size: 11.5) }
 
@@ -92,8 +92,8 @@ enum JSONHighlighter {
         result.endEditing()
         var active: NSRange?
         if !highlights.isEmpty {
-            let warnBg = LogXTheme.dynamicNS(dark: 0xE0A23C, light: 0xA96B0C).withAlphaComponent(0.42)
-            let accentBg = LogXTheme.dynamicNS(dark: 0x1FB6D4, light: 0x0A6073).withAlphaComponent(0.26)
+            let warnBg = LogXTheme.dynamicNS(LogXPalette.warn).withAlphaComponent(0.42)
+            let accentBg = LogXTheme.dynamicNS(LogXPalette.accent).withAlphaComponent(0.26)
             for (i, range) in highlights.enumerated() {
                 let nsRange = NSRange(range, in: text)
                 guard nsRange.location != NSNotFound, nsRange.location + nsRange.length <= result.length else { continue }
@@ -105,13 +105,17 @@ enum JSONHighlighter {
     }
 
     static func nsColor(_ kind: JSONSpanKind) -> NSColor {
+        LogXTheme.dynamicNS(hex(kind))
+    }
+
+    static func hex(_ kind: JSONSpanKind) -> LogXHexPair {
         switch kind {
-        case .key: return LogXTheme.dynamicNS(dark: 0x7DD3FC, light: 0x0B5F86)
-        case .string: return LogXTheme.dynamicNS(dark: 0xCE9178, light: 0x8F4A1E)
-        case .number: return LogXTheme.dynamicNS(dark: 0x86EFAC, light: 0x146B3A)
-        case .boolNull: return LogXTheme.dynamicNS(dark: 0xC586C0, light: 0x6B3FA0)
-        case .punct: return LogXTheme.dynamicNS(dark: 0x94A3B8, light: 0x59626F)
-        case .plain: return LogXTheme.dynamicNS(dark: 0xCBD5E1, light: 0x141821)
+        case .key: return LogXPalette.jsonKey
+        case .string: return LogXPalette.jsonString
+        case .number: return LogXPalette.jsonNumber
+        case .boolNull: return LogXPalette.jsonBoolNull
+        case .punct: return LogXPalette.jsonPunct
+        case .plain: return LogXPalette.jsonPlain
         }
     }
 

@@ -10,25 +10,36 @@ struct RequestRow: View {
     var showTimeColumn: Bool = true
     @State private var hovered = false
     @State private var copied = false
+    @State private var entered = true
+
+    static let height: CGFloat = 54
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             statusPill
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 metaLine
                 pathLine
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             metrics
-            favoriteButton.frame(width: 18, alignment: .trailing)
+            favoriteButton.frame(width: 16, alignment: .trailing)
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: 52)
+        .frame(minHeight: Self.height)
         .background(rowBackground)
+        .overlay(alignment: .leading) {
+            if selected {
+                Rectangle().fill(LogXTheme.accent).frame(width: 3)
+            }
+        }
         .contentShape(Rectangle())
         .overlay(alignment: .bottom) {
             Rectangle().fill(LogXTheme.divider).frame(height: 1)
         }
+        .opacity(entered ? 1 : 0)
+        .offset(y: entered ? 0 : -LogXMotion.rowInsertOffset)
+        .onAppear(perform: enter)
         .onTapGesture { store.selectLog(log) }
         .onHover { hovered = $0 }
         .accessibilityElement(children: .contain)
@@ -36,40 +47,47 @@ struct RequestRow: View {
         .accessibilityLabel("\(log.method) \(log.responseCode.map(String.init) ?? "NET") \(store.displayPath(log))")
     }
 
+    private func enter() {
+        guard RowEntrance.shouldAnimate(ts: log.ts, now: Date()), let animation = LogXMotion.rowInsert else { return }
+        entered = false
+        withAnimation(animation) { entered = true }
+    }
+
     private var rowBackground: Color {
         if selected { return LogXTheme.selection }
-        return hovered ? LogXTheme.panel2 : Color.clear
+        return hovered ? LogXTheme.panel2.opacity(0.6) : Color.clear
     }
 
     private var statusPill: some View {
         Text(log.responseCode.map(String.init) ?? "NET")
             .font(LogXType.mono(11, .bold))
             .foregroundStyle(LogXTheme.status(log.statusClass))
-            .frame(width: 42, height: 21)
-            .background(LogXTheme.statusTint(log.statusClass), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .lineLimit(1)
+            .frame(width: 44, height: 22)
+            .background(LogXTheme.statusTint(log.statusClass), in: RoundedRectangle(cornerRadius: LogXRadius.chip, style: .continuous))
             .help(log.statusDescription)
             .accessibilityLabel("Status \(log.responseCode.map(String.init) ?? "tarmoq xatosi")")
     }
 
     private var metaLine: some View {
-        HStack(spacing: 7) {
-            Text(log.method)
-                .font(LogXType.mono(LogXType.caption, .bold))
+        HStack(spacing: 8) {
+            Text(log.method.uppercased())
+                .font(LogXType.mono(LogXType.caption, .semibold))
                 .tracking(0.6)
-                .foregroundStyle(selected ? LogXTheme.accent : LogXTheme.muted)
+                .foregroundStyle(log.method.uppercased() == "DELETE" ? LogXTheme.err : LogXTheme.muted)
                 .fixedSize()
 
             if !log.hostLabel.isEmpty, store.hasMultipleHosts {
                 Text(log.hostLabel)
                     .font(LogXType.mono(LogXType.caption))
-                    .foregroundStyle(LogXTheme.muted2)
+                    .foregroundStyle(LogXTheme.muted)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .layoutPriority(-1)
             }
 
             if showAppColumn, store.selectedAppId == "all", !log.appShortLabel.isEmpty {
-                badge(log.appShortLabel, tint: LogXTheme.accent)
+                badge(log.appShortLabel, tint: LogXTheme.text2)
                     .help(log.appLabel)
             }
 
@@ -103,7 +121,7 @@ struct RequestRow: View {
 
     private var pathLine: some View {
         HStack(spacing: 6) {
-            Text(URLHighlighter.attributed(store.displayPath(log), baseFontSize: LogXType.body, selected: selected))
+            Text(URLStyle.attributed(store.displayPath(log), size: LogXType.body, weight: selected ? .semibold : .medium))
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .help(store.shareableURL(log))
@@ -129,18 +147,20 @@ struct RequestRow: View {
     }
 
     private var metrics: some View {
-        VStack(alignment: .trailing, spacing: 3) {
+        VStack(alignment: .trailing, spacing: 4) {
             Text(log.formattedDuration)
-                .font(LogXType.mono(LogXType.meta, selected ? .semibold : .regular))
+                .font(LogXType.mono(LogXType.meta, selected ? .semibold : .medium))
                 .foregroundStyle(durationColor)
+                .lineLimit(1)
             if showTimeColumn {
                 Text(RelativeTime.clock(ts: log.ts))
-                    .font(LogXType.mono(LogXType.caption))
-                    .foregroundStyle(LogXTheme.muted2)
+                    .font(LogXType.mono(10.5))
+                    .foregroundStyle(LogXTheme.muted)
+                    .lineLimit(1)
                     .help(RelativeTime.label(ts: log.ts, now: now))
             }
         }
-        .frame(width: 72, alignment: .trailing)
+        .frame(minWidth: 74, alignment: .trailing)
         .fixedSize(horizontal: true, vertical: false)
     }
 
@@ -149,9 +169,9 @@ struct RequestRow: View {
             .font(LogXType.mono(9, .bold))
             .tracking(0.4)
             .foregroundStyle(tint)
-            .padding(.horizontal, 4.5)
-            .padding(.vertical, 1.5)
-            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 3, style: .continuous))
             .lineLimit(1)
             .fixedSize()
     }
@@ -173,9 +193,22 @@ struct RequestRow: View {
     }
 
     private var durationColor: Color {
-        guard let ms = log.durationMs else { return LogXTheme.muted2 }
-        if ms >= LogNoise.verySlowThresholdMs { return LogXTheme.err }
-        if ms >= LogNoise.slowThresholdMs { return LogXTheme.warn }
-        return LogXTheme.text2
+        switch SignalTrace.level(log.durationMs.map(Double.init)) {
+        case .verySlow: return LogXTheme.err
+        case .slow: return LogXTheme.warn
+        case .normal: return LogXTheme.text2
+        case .unmeasured: return LogXTheme.muted
+        }
+    }
+}
+
+enum RowEntrance {
+    static let window: TimeInterval = 1.5
+
+    static func shouldAnimate(ts: Double?, now: Date) -> Bool {
+        guard let ts else { return false }
+        let seconds = ts > 10_000_000_000 ? ts / 1000 : ts
+        let age = now.timeIntervalSince1970 - seconds
+        return age >= -window && age < window
     }
 }

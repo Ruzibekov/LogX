@@ -5,6 +5,7 @@ struct DeviceRail: View {
     @EnvironmentObject private var store: LogStore
 
     static let width: CGFloat = 56
+    static let avatar: CGFloat = 38
 
     var body: some View {
         VStack(spacing: 10) {
@@ -33,8 +34,8 @@ struct DeviceRail: View {
             if store.devices.isEmpty {
                 Image(systemName: "cable.connector.slash")
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(LogXTheme.muted2)
-                    .frame(width: 40, height: 40)
+                    .foregroundStyle(LogXTheme.muted)
+                    .frame(width: 38, height: 38)
                     .help(store.adbConflict == nil ? "USB yo'q — telefonni ulang" : "USB band — boshqa adb server qurilmani ushlab turibdi")
             }
 
@@ -47,7 +48,7 @@ struct DeviceRail: View {
         .padding(.vertical, 12)
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(LogXTheme.panel)
+        .background(LogXTheme.chrome)
         .overlay(alignment: .trailing) { Rectangle().fill(LogXTheme.line).frame(width: 1) }
     }
 
@@ -67,24 +68,22 @@ struct DeviceRail: View {
     ) -> some View {
         Button(action: action) {
             Text(label)
-                .font(LogXType.mono(LogXType.meta, .bold))
-                .foregroundStyle(selected ? LogXTheme.accent : LogXTheme.text2)
-                .frame(width: 40, height: 40)
+                .font(LogXType.ui(LogXType.meta, .bold))
+                .foregroundStyle(selected ? LogXTheme.onAccent : LogXTheme.text2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: Self.avatar, height: Self.avatar)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(selected ? LogXTheme.chipOn : LogXTheme.panel2)
+                    RoundedRectangle(cornerRadius: LogXRadius.avatar, style: .continuous)
+                        .fill(selected ? LogXTheme.accent : LogXTheme.panel2)
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(selected ? LogXTheme.chipOnEdge : LogXTheme.line, lineWidth: 1)
-                )
-                .overlay(alignment: .topTrailing) {
+                .overlay(alignment: .bottomTrailing) {
                     if online {
                         Circle()
                             .fill(LogXTheme.ok)
-                            .frame(width: 7, height: 7)
-                            .overlay(Circle().stroke(LogXTheme.panel, lineWidth: 1.5))
-                            .offset(x: 3, y: -3)
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(LogXTheme.chrome, lineWidth: 2))
+                            .offset(x: 1, y: 1)
                     }
                 }
         }
@@ -132,7 +131,7 @@ struct DeviceRail: View {
 
     private var favoritesButton: some View {
         Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.toggleFavoritesOnly() }
+            LogXMotion.perform(LogXMotion.snappy) { store.toggleFavoritesOnly() }
         } label: {
             railIcon(store.favoritesOnly ? "star.fill" : "star", active: store.favoritesOnly, tint: LogXTheme.warn)
                 .overlay(alignment: .topTrailing) {
@@ -176,8 +175,8 @@ struct DeviceRail: View {
             .foregroundStyle(active ? tint : LogXTheme.muted)
             .frame(width: 34, height: 34)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(active ? tint.opacity(0.14) : Color.clear)
+                RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
+                    .fill(active ? (tint == LogXTheme.accent ? LogXTheme.chipOn : tint.opacity(0.12)) : Color.clear)
             )
     }
 }

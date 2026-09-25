@@ -11,6 +11,10 @@ cp "$BIN" "$DIST/Contents/MacOS/LogX"
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   cp "$ROOT/Resources/AppIcon.icns" "$DIST/Contents/Resources/AppIcon.icns"
 fi
+if [[ -d "$ROOT/Resources/Fonts" ]]; then
+  mkdir -p "$DIST/Contents/Resources/Fonts"
+  cp "$ROOT/Resources/Fonts/"*.ttf "$ROOT/Resources/Fonts/"*.txt "$DIST/Contents/Resources/Fonts/"
+fi
 cat > "$DIST/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -29,6 +33,7 @@ cat > "$DIST/Contents/Info.plist" <<'PLIST'
   <key>LSUIElement</key><false/>
   <key>LSBackgroundOnly</key><false/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>ATSApplicationFontsPath</key><string>Fonts</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsLocalNetworking</key><true/>

@@ -17,12 +17,12 @@ struct DetailFindBar: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(LogXTheme.muted2)
+                .foregroundStyle(LogXTheme.muted)
             TextField("Tana ichida qidirish", text: $query)
                 .accessibilityLabel("JSON ichida topish")
                 .focused($focused)
                 .textFieldStyle(.plain)
-                .font(LogXType.mono(LogXType.meta))
+                .font(LogXType.ui(LogXType.meta))
                 .foregroundStyle(LogXTheme.text)
                 .onChange(of: query) { _, _ in
                     index = 0
@@ -46,21 +46,24 @@ struct DetailFindBar: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(matchCount == 0 ? LogXTheme.well : LogXTheme.chipOn))
-                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: label)
+                .animation(LogXMotion.snappy, value: label)
             stepButton(icon: "chevron.up", help: "Oldingi (⇧⌘G)", label: "Oldingi topilma", reverse: true)
                 .keyboardShortcut("g", modifiers: [.command, .shift])
             stepButton(icon: "chevron.down", help: "Keyingi (⌘G)", label: "Keyingi topilma", reverse: false)
                 .keyboardShortcut("g", modifiers: .command)
         }
         .padding(.horizontal, 10)
-        .frame(height: 26)
+        .frame(height: 28)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(LogXTheme.panel2)
+            RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous).fill(LogXTheme.panel)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous).stroke(focused ? LogXTheme.focusRing : LogXTheme.line, lineWidth: 1)
         )
     }
 
     private func step(reverse: Bool) {
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+        LogXMotion.perform(LogXMotion.snappy) {
             index = JSONFind.nextIndex(current: index, count: matchCount, reverse: reverse)
         }
     }

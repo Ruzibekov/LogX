@@ -37,81 +37,16 @@ struct ContentView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 titleBarIcon("sidebar.leading", active: sidebarVisible, help: sidebarVisible ? "Qurilma reykini yashirish" : "Qurilma reykini ko'rsatish", label: "Qurilma reyki") {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                    LogXMotion.perform(LogXMotion.snappy) {
                         sidebarVisible.toggle()
                     }
                 }
             }
             ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.system(size: 12.5, weight: .bold))
-                        .foregroundStyle(LogXTheme.accent)
-                    Text("LogX")
-                        .font(LogXType.ui(LogXType.title, .bold))
-                        .foregroundStyle(LogXTheme.text)
-                    Text(scopeTitle)
-                        .font(LogXType.mono(LogXType.meta))
-                        .foregroundStyle(LogXTheme.muted)
-                        .lineLimit(1)
-                }
+                ToolbarTitle(scopeTitle: scopeTitle)
             }
-            ToolbarItemGroup(placement: .primaryAction) {
-                titleBarIcon(
-                    "arrow.down.to.line",
-                    active: store.followLatest,
-                    help: store.followLatest ? "Kuzat yoqilgan — eng yangi so'rov tepada ko'rinadi (⌘L)" : "Kuzat — yangi so'rovni kuzatish (⌘L)",
-                    label: "Kuzat"
-                ) {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        store.toggleFollowLatest()
-                    }
-                }
-
-                titleBarIcon(
-                    "arrow.clockwise",
-                    active: false,
-                    help: "Monitorga qayta ulanish",
-                    label: "Qayta ulash"
-                ) {
-                    Task { await store.start() }
-                }
-
-                Menu {
-                    Button("HAR saqlash") { store.exportHAR() }
-                    Button("JSON saqlash") { store.exportJSON() }
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(store.canExport ? LogXTheme.muted : LogXTheme.muted2)
-                        .frame(width: 30, height: 30)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 30, height: 30)
-                .disabled(!store.canExport)
-                .help(store.canExport ? "Saqlash — ko'rinadigan sessiya HAR yoki JSON" : "Saqlash uchun ko'rinadigan so'rov yo'q")
-                .accessibilityLabel("Sessiyani saqlash")
-
-                Menu {
-                    Button(store.redactEnabled ? "Tokenlarni ko'rsatish" : "Tokenlarni yashirish") { store.redactEnabled.toggle() }
-                    Button(store.hideNoise ? "Shovqinni ko'rsatish" : "Shovqinni yashirish") { store.toggleHideNoise() }
-                    Divider()
-                    Button("Ro'yxatni tozalash") { store.clearLogs() }
-                        .disabled(store.logCount == 0)
-                    Button("Tozalashni bekor qilish") { store.undoClear() }
-                        .disabled(!store.canUndoClear)
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(LogXTheme.muted)
-                        .frame(width: 30, height: 30)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 30, height: 30)
-                .help("Ko'rinish sozlamalari")
-                .accessibilityLabel("Sozlamalar")
+            ToolbarItem(placement: .primaryAction) {
+                ToolbarActions()
             }
         }
     }
@@ -129,7 +64,7 @@ struct ContentView: View {
                 .foregroundStyle(active ? LogXTheme.accent : LogXTheme.muted)
                 .frame(width: 30, height: 30)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
                         .fill(active ? LogXTheme.chipOn : Color.clear)
                 )
         }
@@ -164,4 +99,117 @@ enum LogXNotice {
     static let zoomIn = Notification.Name("logx.zoomIn")
     static let zoomOut = Notification.Name("logx.zoomOut")
     static let zoomReset = Notification.Name("logx.zoomReset")
+}
+
+struct ToolbarTitle: View {
+    @EnvironmentObject private var store: LogStore
+    var scopeTitle: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 7) {
+                Image(systemName: "waveform.path.ecg")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(LogXTheme.accent)
+                Text("LogX")
+                    .font(LogXType.ui(LogXType.title, .bold))
+                    .foregroundStyle(LogXTheme.text)
+            }
+            HStack(spacing: 8) {
+                LiveDot(tint: store.connection == .live ? LogXTheme.ok : LogXTheme.muted, pulsing: store.connection == .live, size: 6)
+                Text(scopeTitle)
+                    .font(LogXType.mono(11))
+                    .foregroundStyle(LogXTheme.muted)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .overlay(
+                RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
+                    .stroke(LogXTheme.line, lineWidth: 1)
+            )
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+struct ToolbarActions: View {
+    @EnvironmentObject private var store: LogStore
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                LogXMotion.perform(LogXMotion.snappy) {
+                    store.toggleFollowLatest()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Kuzat")
+                        .font(LogXType.ui(12.5, .medium))
+                }
+            }
+            .buttonStyle(LogXButtonStyle(kind: store.followLatest ? .tinted : .outline))
+            .help(store.followLatest ? "Kuzat yoqilgan — eng yangi so'rov tepada ko'rinadi (⌘L)" : "Kuzat — yangi so'rovni kuzatish (⌘L)")
+            .accessibilityLabel("Kuzat")
+            .accessibilityValue(store.followLatest ? "yoqilgan" : "o'chirilgan")
+
+            Button {
+                Task { await store.start() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Qayta ulash")
+                        .font(LogXType.ui(12.5, .medium))
+                }
+            }
+            .buttonStyle(LogXButtonStyle(kind: .outline))
+            .help("Monitorga qayta ulanish")
+            .accessibilityLabel("Qayta ulash")
+
+            Menu {
+                Button("HAR saqlash") { store.exportHAR() }
+                Button("JSON saqlash") { store.exportJSON() }
+            } label: {
+                outlinedIcon("square.and.arrow.down", tint: store.canExport ? LogXTheme.text2 : LogXTheme.muted2)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 30, height: 30)
+            .disabled(!store.canExport)
+            .help(store.canExport ? "Saqlash — ko'rinadigan sessiya HAR yoki JSON" : "Saqlash uchun ko'rinadigan so'rov yo'q")
+            .accessibilityLabel("Sessiyani saqlash")
+
+            Menu {
+                Button(store.redactEnabled ? "Tokenlarni ko'rsatish" : "Tokenlarni yashirish") { store.redactEnabled.toggle() }
+                Button(store.hideNoise ? "Shovqinni ko'rsatish" : "Shovqinni yashirish") { store.toggleHideNoise() }
+                Divider()
+                Button("Ro'yxatni tozalash") { store.clearLogs() }
+                    .disabled(store.logCount == 0)
+                Button("Tozalashni bekor qilish") { store.undoClear() }
+                    .disabled(!store.canUndoClear)
+            } label: {
+                outlinedIcon("gearshape", tint: LogXTheme.text2)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 30, height: 30)
+            .help("Ko'rinish sozlamalari")
+            .accessibilityLabel("Sozlamalar")
+        }
+    }
+
+    private func outlinedIcon(_ name: String, tint: Color) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 30, height: 30)
+            .overlay(
+                RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
+                    .stroke(LogXTheme.line, lineWidth: 1)
+            )
+    }
 }

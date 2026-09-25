@@ -6,66 +6,69 @@ struct RequestFilterBar: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 searchField
-                livePill
                 sortMenu
                 clearLogsButton
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    statusChip("Hammasi", count: store.statusCount(.all), tint: LogXTheme.accent, active: !store.errorsOnly && store.status == .all) {
-                        store.selectStatus(.all)
-                    }
-                    ForEach([StatusClass.ok2xx, .redirect3xx, .err4xx, .err5xx, .net], id: \.self) { item in
-                        statusChip(item.title, count: store.statusCount(item), tint: LogXTheme.status(item), active: !store.errorsOnly && store.status == item) {
-                            store.selectStatus(item)
+            HStack(spacing: 6) {
+                livePill
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        statusChip("Hammasi", count: store.statusCount(.all), active: !store.errorsOnly && store.status == .all) {
+                            store.selectStatus(.all)
                         }
+                        ForEach([StatusClass.ok2xx, .redirect3xx, .err4xx, .err5xx, .net], id: \.self) { item in
+                            statusChip(item.title, count: store.statusCount(item), active: !store.errorsOnly && store.status == item) {
+                                store.selectStatus(item)
+                            }
+                        }
+                        errorPill
+                        divider
+                        ForEach(["GET", "POST", "PUT", "PATCH", "DELETE"], id: \.self) { method in
+                            methodChip(method)
+                        }
+                        divider
+                        noiseToggle
+                        slowPill
+                        ForEach(store.uniqueHosts.count > 1 ? store.uniqueHosts : [], id: \.self) { host in
+                            hostChip(host)
+                        }
+                        if store.hasActiveFilter { clearButton }
                     }
-                    errorPill
-                    divider
-                    ForEach(["GET", "POST", "PUT", "PATCH", "DELETE"], id: \.self) { method in
-                        methodChip(method)
-                    }
-                    divider
-                    noiseToggle
-                    slowPill
-                    ForEach(store.uniqueHosts.count > 1 ? store.uniqueHosts : [], id: \.self) { host in
-                        hostChip(host)
-                    }
-                    if store.hasActiveFilter { clearButton }
+                    .padding(.trailing, 14)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
-                .padding(.trailing, 14)
-                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(LogXTheme.panel)
-        .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.status)
-        .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.selectedMethod)
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: store.hasActiveFilter)
-        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.hideNoise)
-        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.slowOnly)
-        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: store.selectedHost)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(LogXTheme.bg)
+        .animation(LogXMotion.settle, value: store.status)
+        .animation(LogXMotion.settle, value: store.selectedMethod)
+        .animation(LogXMotion.settle, value: store.hasActiveFilter)
+        .animation(LogXMotion.snappy, value: store.hideNoise)
+        .animation(LogXMotion.snappy, value: store.slowOnly)
+        .animation(LogXMotion.snappy, value: store.selectedHost)
     }
 
     private var divider: some View {
         Rectangle()
             .fill(LogXTheme.line)
-            .frame(width: 1, height: 16)
+            .frame(width: 1, height: 14)
             .padding(.horizontal, 2)
     }
 
     private var searchField: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(searchFocused ? LogXTheme.accent : LogXTheme.muted2)
+                .foregroundStyle(searchFocused ? LogXTheme.accent : LogXTheme.muted)
             TextField("Host, URL, sarlavha, tana", text: Binding(get: { store.query }, set: { store.applyQuery($0) }))
                 .textFieldStyle(.plain)
-                .font(LogXType.mono(LogXType.body))
+                .font(LogXType.ui(LogXType.body))
                 .foregroundStyle(LogXTheme.text)
                 .focused($searchFocused)
                 .accessibilityLabel("So'rovlarni qidirish")
@@ -80,13 +83,13 @@ struct RequestFilterBar: View {
                 }
             if store.query.isEmpty {
                 Text("⌘F")
-                    .font(LogXType.mono(LogXType.caption, .semibold))
-                    .foregroundStyle(LogXTheme.muted2)
+                    .font(LogXType.mono(LogXType.caption))
+                    .foregroundStyle(LogXTheme.muted)
             } else {
                 Button { store.applyQuery("") } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(LogXTheme.muted2)
+                        .foregroundStyle(LogXTheme.muted)
                 }
                 .buttonStyle(.plain)
                 .help("Qidiruvni tozalash (Esc)")
@@ -94,37 +97,43 @@ struct RequestFilterBar: View {
             }
         }
         .padding(.horizontal, 10)
-        .frame(height: 30)
+        .frame(height: 32)
         .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.well)
+            RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous).fill(LogXTheme.panel)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous)
                         .stroke(searchFocused ? LogXTheme.focusRing : LogXTheme.line, lineWidth: 1)
                 )
         )
     }
 
     private var livePill: some View {
-        Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.togglePause() }
+        let tint = store.isPaused ? LogXTheme.warn : LogXTheme.ok
+        return Button {
+            LogXMotion.perform(LogXMotion.snappy) { store.togglePause() }
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: store.isPaused ? "pause.fill" : "bolt.fill")
-                    .font(.system(size: 9.5, weight: .bold))
+                if store.isPaused {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 7.5, weight: .bold))
+                } else {
+                    LiveDot(tint: tint, pulsing: store.connection == .live, size: 6)
+                }
                 Text(store.isPaused ? "PAUZA" : "JONLI")
-                    .font(LogXType.ui(LogXType.caption, .bold))
-                    .tracking(0.7)
+                    .font(LogXType.mono(10.5, .semibold))
             }
-            .foregroundStyle(store.isPaused ? LogXTheme.warn : LogXTheme.accent)
-            .padding(.horizontal, 11)
-            .frame(height: 30)
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 7)
+            .frame(height: 24)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(store.isPaused ? LogXTheme.warn.opacity(0.14) : LogXTheme.chipOn)
+                RoundedRectangle(cornerRadius: LogXRadius.chip, style: .continuous)
+                    .fill(store.isPaused ? LogXTheme.warn.opacity(0.12) : Color.clear)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(store.isPaused ? LogXTheme.warn.opacity(0.45) : LogXTheme.chipOnEdge, lineWidth: 1)
+                RoundedRectangle(cornerRadius: LogXRadius.chip, style: .continuous)
+                    .stroke(tint, lineWidth: 1)
             )
         }
         .buttonStyle(LogXPressStyle())
@@ -141,16 +150,11 @@ struct RequestFilterBar: View {
             sortItem("Metod", field: .method)
             sortItem("Manzil", field: .path)
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(store.sortField == .time && store.sortOrder == .descending ? LogXTheme.muted : LogXTheme.accent)
-                .frame(width: 30, height: 30)
-                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.well))
-                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
+            squareIcon("arrow.up.arrow.down", tint: store.sortField == .time && store.sortOrder == .descending ? LogXTheme.muted : LogXTheme.accent)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(width: 30, height: 30)
+        .frame(width: 32, height: 32)
         .help("Saralash tartibi")
         .accessibilityLabel("Saralash")
     }
@@ -169,14 +173,9 @@ struct RequestFilterBar: View {
 
     private var clearLogsButton: some View {
         Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.clearLogs() }
+            LogXMotion.perform(LogXMotion.snappy) { store.clearLogs() }
         } label: {
-            Image(systemName: "trash")
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(LogXTheme.muted)
-                .frame(width: 30, height: 30)
-                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(LogXTheme.well))
-                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
+            squareIcon("trash", tint: LogXTheme.muted)
         }
         .buttonStyle(LogXPressStyle())
         .disabled(store.logCount == 0)
@@ -185,79 +184,63 @@ struct RequestFilterBar: View {
         .accessibilityLabel("Ro'yxatni tozalash")
     }
 
+    private func squareIcon(_ name: String, tint: Color) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 32, height: 32)
+            .background(RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous).fill(LogXTheme.panel))
+            .overlay(RoundedRectangle(cornerRadius: LogXRadius.control, style: .continuous).stroke(LogXTheme.line, lineWidth: 1))
+    }
+
     private var clearButton: some View {
-        Button { withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) { store.clearFilters() } } label: {
+        Button { LogXMotion.perform(LogXMotion.settle) { store.clearFilters() } } label: {
             HStack(spacing: 4) {
                 Image(systemName: "xmark.circle")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 9.5, weight: .bold))
                 Text("Tozalash")
-                    .font(LogXType.ui(LogXType.caption, .semibold))
+                    .font(LogXType.mono(10.5, .medium))
             }
             .foregroundStyle(LogXTheme.accent)
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 9)
-            .frame(height: 26)
+            .padding(.horizontal, 7)
+            .frame(height: 24)
         }
         .buttonStyle(LogXPressStyle())
         .help("Barcha filtrlarni tozalash")
     }
 
-    private func statusChip(_ title: String, count: Int, tint: Color, active: Bool, action: @escaping () -> Void) -> some View {
-        Button { withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) { action() } } label: {
-            HStack(spacing: 6) {
+    private func statusChip(_ title: String, count: Int, active: Bool, action: @escaping () -> Void) -> some View {
+        Button { LogXMotion.perform(LogXMotion.settle) { action() } } label: {
+            HStack(spacing: 5) {
                 Text(title)
-                    .font(LogXType.ui(LogXType.meta, active ? .semibold : .medium))
+                    .font(LogXType.mono(10.5, active ? .semibold : .medium))
                 Text("\(count)")
-                    .font(LogXType.mono(LogXType.caption, .semibold))
-                    .foregroundStyle(active ? tint : LogXTheme.muted2)
+                    .font(LogXType.mono(10.5, active ? .semibold : .regular))
+                    .foregroundStyle(active ? LogXTheme.accent : (count > 0 ? LogXTheme.text2 : LogXTheme.muted))
             }
-            .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
-            .lineLimit(1)
-            .fixedSize()
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(active ? tint.opacity(0.14) : LogXTheme.panel2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(active ? tint.opacity(0.4) : Color.clear, lineWidth: 1)
-            )
+            .modifier(FilterChipFrame(active: active))
         }
         .buttonStyle(LogXPressStyle())
     }
 
     private func methodChip(_ method: String) -> some View {
         let active = store.selectedMethod == method
-        return Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.selectMethod(active ? "ALL" : method) } } label: {
+        return Button { LogXMotion.perform(LogXMotion.snappy) { store.selectMethod(active ? "ALL" : method) } } label: {
             Text(method)
-                .font(LogXType.mono(LogXType.caption, active ? .bold : .medium))
-                .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(active ? LogXTheme.chipOn : LogXTheme.panel2)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(active ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
-                )
+                .font(LogXType.mono(10.5, active ? .semibold : .medium))
+                .modifier(FilterChipFrame(active: active))
         }
         .buttonStyle(LogXPressStyle())
         .help("\(method) so'rovlari")
     }
 
     private var noiseToggle: some View {
-        Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.toggleHideNoise() } } label: {
+        Button { LogXMotion.perform(LogXMotion.snappy) { store.toggleHideNoise() } } label: {
             chipLabel(
                 store.hideNoise && store.noiseHiddenCount > 0 ? "Shovqin \(store.noiseHiddenCount)" : "Shovqin",
-                active: store.hideNoise,
-                tint: LogXTheme.accent
+                active: store.hideNoise
             )
         }
         .buttonStyle(LogXPressStyle())
@@ -265,7 +248,7 @@ struct RequestFilterBar: View {
     }
 
     private var slowPill: some View {
-        Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.toggleSlowOnly() } } label: {
+        Button { LogXMotion.perform(LogXMotion.snappy) { store.toggleSlowOnly() } } label: {
             chipLabel("Sekin", active: store.slowOnly, tint: LogXTheme.warn)
         }
         .buttonStyle(LogXPressStyle())
@@ -274,68 +257,54 @@ struct RequestFilterBar: View {
 
     private func hostChip(_ host: String) -> some View {
         let active = store.selectedHost == host
-        return Button { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { store.selectHost(host) } } label: {
+        return Button { LogXMotion.perform(LogXMotion.snappy) { store.selectHost(host) } } label: {
             Text(host)
-                .font(LogXType.mono(LogXType.caption, active ? .semibold : .regular))
-                .foregroundStyle(active ? LogXTheme.text : LogXTheme.muted)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(active ? LogXTheme.chipOn : LogXTheme.panel2)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(active ? LogXTheme.chipOnEdge : Color.clear, lineWidth: 1)
-                )
+                .font(LogXType.mono(10.5, active ? .semibold : .regular))
+                .modifier(FilterChipFrame(active: active))
         }
         .buttonStyle(LogXPressStyle())
         .help(host)
     }
 
     private var errorPill: some View {
-        Button { withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) { store.toggleErrorsOnly() } } label: {
+        Button { LogXMotion.perform(LogXMotion.settle) { store.toggleErrorsOnly() } } label: {
             HStack(spacing: 5) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 8.5, weight: .bold))
+                    .font(.system(size: 8, weight: .bold))
                 Text("\(store.errorCount)")
-                    .font(LogXType.mono(LogXType.caption, .bold))
+                    .font(LogXType.mono(10.5, .semibold))
             }
-            .foregroundStyle(store.errorsOnly || store.errorCount > 0 ? LogXTheme.err : LogXTheme.muted2)
-            .lineLimit(1)
-            .fixedSize()
-            .padding(.horizontal, 9)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(store.errorsOnly ? LogXTheme.err.opacity(0.16) : LogXTheme.panel2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(store.errorsOnly ? LogXTheme.err.opacity(0.42) : Color.clear, lineWidth: 1)
-            )
+            .modifier(FilterChipFrame(active: store.errorsOnly, tint: LogXTheme.err, idleInk: store.errorCount > 0 ? LogXTheme.err : LogXTheme.muted))
         }
         .buttonStyle(LogXPressStyle())
         .help("Faqat xatolar: 4xx + 5xx + NET")
     }
 
-    private func chipLabel(_ title: String, active: Bool, tint: Color) -> some View {
+    private func chipLabel(_ title: String, active: Bool, tint: Color = LogXTheme.accent) -> some View {
         Text(title)
-            .font(LogXType.ui(LogXType.meta, active ? .semibold : .medium))
-            .foregroundStyle(active ? tint : LogXTheme.muted)
+            .font(LogXType.mono(10.5, active ? .semibold : .medium))
+            .modifier(FilterChipFrame(active: active, tint: tint))
+    }
+}
+
+struct FilterChipFrame: ViewModifier {
+    var active: Bool
+    var tint: Color = LogXTheme.accent
+    var idleInk: Color = LogXTheme.text2
+
+    private var activeFill: Color {
+        tint == LogXTheme.accent ? LogXTheme.chipOn : tint.opacity(0.12)
+    }
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: LogXRadius.chip, style: .continuous)
+        return content
+            .foregroundStyle(active ? tint : idleInk)
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(active ? tint.opacity(0.14) : LogXTheme.panel2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(active ? tint.opacity(0.4) : Color.clear, lineWidth: 1)
-            )
+            .padding(.horizontal, 7)
+            .frame(height: 24)
+            .background(shape.fill(active ? activeFill : Color.clear))
+            .overlay(shape.stroke(active ? tint.opacity(0.45) : LogXTheme.line, lineWidth: 1))
     }
 }

@@ -38,10 +38,10 @@ extension RequestDetail {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Text(title)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(LogXType.ui(11.5, .bold))
                     .foregroundStyle(LogXTheme.text)
                 Text("\(headers.count)")
-                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                    .font(LogXType.mono(9.5, .bold))
                     .foregroundStyle(LogXTheme.muted2)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)

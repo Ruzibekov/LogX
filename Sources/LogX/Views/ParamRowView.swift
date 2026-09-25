@@ -9,7 +9,7 @@ struct ParamRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Text(key)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .font(LogXType.mono(11, .semibold))
                 .foregroundStyle(JSONHighlighter.spanColor(.key))
                 .frame(minWidth: 90, idealWidth: 130, maxWidth: 200, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)

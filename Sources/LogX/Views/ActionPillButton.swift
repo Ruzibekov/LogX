@@ -21,7 +21,7 @@ struct ActionPillButton: View {
                 }
                 if !title.isEmpty {
                     Text(title)
-                        .font(.system(size: 11, weight: isPrimary ? .semibold : .medium))
+                        .font(LogXType.ui(11.5, isPrimary ? .semibold : .medium))
                         .lineLimit(1)
                 }
                 if let shortcut {
@@ -39,7 +39,7 @@ struct ActionPillButton: View {
                     .stroke(isPrimary ? (hovered ? LogXTheme.accent : LogXTheme.line) : (hovered ? LogXTheme.line : Color.clear), lineWidth: 1)
             )
             .foregroundStyle(isPrimary ? LogXTheme.accentLight : (isEnabled ? (hovered ? LogXTheme.text : LogXTheme.muted) : LogXTheme.muted2))
-            .animation(.easeOut(duration: 0.12), value: hovered)
+            .animation(LogXMotion.hover, value: hovered)
         }
         .buttonStyle(LogXPressStyle())
         .fixedSize(horizontal: true, vertical: false)

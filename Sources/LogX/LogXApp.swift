@@ -60,6 +60,8 @@ final class LogXAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidati
             defer: false
         )
         window.title = "LogX"
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = LogXTheme.chromeNS
         window.contentViewController = hosting
         window.minSize = NSSize(width: 960, height: 640)
         window.isReleasedWhenClosed = false
