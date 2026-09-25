@@ -13,6 +13,7 @@ struct JSONTreeView: View {
 
     @EnvironmentObject private var store: LogStore
     @State private var collapsed: Set<String>
+    @State private var finder = TreeFinder()
 
     init(tree: JSONTree, query: String, activeIndex: Int, onMatchCount: @escaping (Int) -> Void) {
         self.tree = tree
@@ -32,7 +33,7 @@ struct JSONTreeView: View {
     }
 
     var body: some View {
-        let matches = tree.matches(query: query)
+        let matches = finder.matches(in: tree, query: query)
         let matchSet = Set(matches)
         let active = activeID(in: matches)
         let rows = tree.rows(collapsed: collapsed)
@@ -47,6 +48,7 @@ struct JSONTreeView: View {
                                 isCollapsed: node.kind.isContainer && collapsed.contains(node.id),
                                 matched: matchSet.contains(node.id),
                                 active: node.id == active,
+                                query: matchSet.contains(node.id) ? query : "",
                                 onToggle: { deep in toggle(node, deep: deep) },
                                 menu: { rowMenu(node) }
                             )
@@ -160,6 +162,7 @@ private struct JSONTreeRow<Menu: View>: View {
     let isCollapsed: Bool
     let matched: Bool
     let active: Bool
+    let query: String
     let onToggle: (Bool) -> Void
     @ViewBuilder let menu: () -> Menu
     @State private var hovered = false
@@ -177,7 +180,7 @@ private struct JSONTreeRow<Menu: View>: View {
                 Color.clear.frame(width: 12, height: 1)
             }
             if node.depth > 0 {
-                Text(node.key)
+                Text(TreeFindHighlight.text(node.key, query: query, active: active))
                     .font(LogXType.mono(11.5, .medium))
                     .foregroundStyle(node.key.hasPrefix("[") ? LogXTheme.muted : JSONHighlighter.spanColor(.key))
                     .lineLimit(1)
@@ -189,7 +192,7 @@ private struct JSONTreeRow<Menu: View>: View {
             if node.kind.isContainer {
                 containerValue
             } else {
-                Text(node.displayValue)
+                Text(TreeFindHighlight.text(node.displayValue, query: query, active: active))
                     .font(LogXType.mono(LogXType.body))
                     .foregroundStyle(scalarColor(node.kind))
                     .lineLimit(1)

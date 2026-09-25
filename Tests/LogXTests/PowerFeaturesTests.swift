@@ -432,7 +432,7 @@ final class ReplayDiffStoreTests: XCTestCase {
         let tree = try src("Sources/LogX/Views/JSONTreeView.swift")
         XCTAssertTrue(tree.contains("ScrollView(.vertical)"))
         XCTAssertFalse(tree.contains("[.vertical, .horizontal]"), "ikki o'qli ScrollView LazyVStack kengligini buzadi")
-        XCTAssertTrue(tree.contains("let matches = tree.matches(query: query)"), "topilmalar bir renderda bir marta")
+        XCTAssertTrue(tree.contains("let matches = finder.matches(in: tree, query: query)"), "topilmalar har so'rovga bir marta")
         XCTAssertTrue(tree.contains("Button(\"Yo'lni nusxalash\")"))
         XCTAssertTrue(tree.contains(".keyboardShortcut") == false, "daraxt global tezkor tugmalarni egallamaydi")
         let diff = try src("Sources/LogX/Views/DiffView.swift")
