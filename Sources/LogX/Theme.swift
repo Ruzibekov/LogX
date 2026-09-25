@@ -31,6 +31,11 @@ enum LogXPalette {
     static let err = LogXHexPair(dark: 0xF2685F, light: 0xC2362D)
     static let replay = LogXHexPair(dark: 0x9C8CF0, light: 0x6B5BD0)
     static let barTrack = LogXHexPair(dark: 0x1E2A24, light: 0xC9D6CD)
+    static let methodGet = LogXHexPair(dark: 0x62B3F5, light: 0x1A5FA8)
+    static let methodPost = LogXHexPair(dark: 0xF29A55, light: 0x93430A)
+    static let methodPut = LogXHexPair(dark: 0xB79CF5, light: 0x6A45C4)
+    static let methodPatch = LogXHexPair(dark: 0x4FD1C5, light: 0x0B6560)
+    static let methodDelete = LogXHexPair(dark: 0xF2685F, light: 0xA8281F)
 
     static let jsonKey = LogXHexPair(dark: 0x9FE8B8, light: 0x0F6B34)
     static let jsonString = LogXHexPair(dark: 0xE4EAE6, light: 0x0E1411)
@@ -111,11 +116,7 @@ enum LogXTheme {
     static let focusRing = accent.opacity(0.75)
 
     static func methodColor(_ method: String) -> Color {
-        switch method.uppercased() {
-        case "DELETE": return err
-        case "GET", "POST", "PUT", "PATCH", "HEAD", "OPTIONS": return text2
-        default: return muted
-        }
+        color(MethodTone.of(method).hex)
     }
 
     static func status(_ cls: LogXCore.StatusClass) -> Color {

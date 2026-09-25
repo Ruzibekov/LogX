@@ -145,14 +145,11 @@ final class ThemeAndSelectionTests: XCTestCase {
         XCTAssertTrue(row.contains("LogXTheme.selection"), row)
     }
 
-    func testMethodChipsAreMonochrome() throws {
-        let theme = try source("Sources/LogX/Theme.swift")
-        XCTAssertFalse(theme.contains("#A855F7"), theme)
-        XCTAssertTrue(theme.contains("case \"DELETE\": return err"), theme)
-        for f in ["Sources/LogX/Views/RequestRow.swift", "Sources/LogX/Views/DetailHeader.swift", "Sources/LogX/Views/RequestFilterBar.swift"] {
+    func testMethodChipsUseSharedMethodBadge() throws {
+        for f in ["Sources/LogX/Views/RequestRow.swift", "Sources/LogX/Views/DetailHeader.swift"] {
             let s = try source(f)
+            XCTAssertTrue(s.contains("MethodBadge("), f)
             XCTAssertFalse(s.contains("methodColor(log.method).opacity"), f)
-            XCTAssertFalse(s.contains("methodColor(method)"), f)
         }
     }
 

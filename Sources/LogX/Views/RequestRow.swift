@@ -63,11 +63,7 @@ struct RequestRow: View {
 
     private var metaLine: some View {
         HStack(spacing: 8) {
-            Text(log.method.uppercased())
-                .font(LogXType.mono(LogXType.caption, .semibold))
-                .tracking(0.6)
-                .foregroundStyle(log.method.uppercased() == "DELETE" ? LogXTheme.err : LogXTheme.muted)
-                .fixedSize()
+            MethodBadge(method: log.method, minWidth: 44)
 
             if !log.hostLabel.isEmpty, store.hasMultipleHosts {
                 Text(log.hostLabel)

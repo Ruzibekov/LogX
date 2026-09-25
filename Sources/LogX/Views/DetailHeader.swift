@@ -13,13 +13,7 @@ struct DetailHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: isCollapsed ? 10 : 16) {
             HStack(alignment: .center, spacing: 10) {
-                Text(log.method)
-                    .font(LogXType.mono(11, .bold))
-                    .foregroundStyle(log.method.uppercased() == "DELETE" ? LogXTheme.methodColor(log.method) : LogXTheme.text)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(LogXTheme.panel2, in: RoundedRectangle(cornerRadius: LogXRadius.chip, style: .continuous))
-                    .fixedSize()
+                MethodBadge(method: log.method, size: 11)
 
                 Text(URLStyle.attributed(store.shareableURL(log), size: LogXType.title, weight: .medium))
                     .lineLimit(1)
