@@ -101,4 +101,43 @@ final class MethodBadgeTests: XCTestCase {
             try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("render-filterbar-methods-\(name).png"))
         }
     }
+
+    @MainActor
+    func testSortMenuMethodSwatchShowsEveryMethodColor() throws {
+        let image = MethodSwatch.image
+        XCTAssertFalse(image.isTemplate, "menyu rasmni oq-qora qilib yubormasligi uchun template bo'lmasligi kerak")
+        XCTAssertEqual(image.size.height, MethodSwatch.dot)
+        XCTAssertEqual(MethodSwatch.tones, [.get, .post, .put, .patch, .delete])
+        for (appearanceName, isDark) in [(NSAppearance.Name.darkAqua, true), (.aqua, false)] {
+            let appearance = try XCTUnwrap(NSAppearance(named: appearanceName))
+            let scale: CGFloat = 4
+            let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(image.size.width * scale), pixelsHigh: Int(image.size.height * scale), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            rep.size = image.size
+            appearance.performAsCurrentDrawingAppearance {
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+                image.draw(in: NSRect(origin: .zero, size: image.size))
+                NSGraphicsContext.restoreGraphicsState()
+            }
+            for (i, tone) in MethodSwatch.tones.enumerated() {
+                let center = MethodSwatch.center(of: i)
+                let color = try XCTUnwrap(rep.colorAt(x: Int(center.x * scale), y: Int((image.size.height - center.y) * scale))?.usingColorSpace(.sRGB))
+                let expected = tone.hex.hex(isDark: isDark)
+                XCTAssertEqual(Int((color.redComponent * 255).rounded()), (expected >> 16) & 0xFF, accuracy: 6, "\(tone) \(isDark)")
+                XCTAssertEqual(Int((color.greenComponent * 255).rounded()), (expected >> 8) & 0xFF, accuracy: 6, "\(tone) \(isDark)")
+                XCTAssertEqual(Int((color.blueComponent * 255).rounded()), expected & 0xFF, accuracy: 6, "\(tone) \(isDark)")
+            }
+            if let png = rep.representation(using: .png, properties: [:]) {
+                let dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".screenshots")
+                try? png.write(to: dir.appendingPathComponent("render-sort-method-swatch-\(isDark ? "dark" : "light").png"))
+            }
+        }
+    }
+
+    func testSortMenuMethodItemCarriesSwatchAndNativeCheckmark() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let bar = try String(contentsOf: root.appendingPathComponent("Sources/LogX/Views/RequestFilterBar.swift"), encoding: .utf8)
+        XCTAssertTrue(bar.contains("sortItem(\"Metod\", field: .method, swatch: MethodSwatch.image)"), bar)
+        XCTAssertTrue(bar.contains("Toggle(isOn:"), "tanlangan saralash belgisi menyuning o'z checkmark ustunida bo'lishi kerak")
+    }
 }

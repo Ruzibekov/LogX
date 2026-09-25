@@ -147,7 +147,7 @@ struct RequestFilterBar: View {
             sortItem("Vaqt", field: .time)
             sortItem("Davomiylik", field: .duration)
             sortItem("Kod", field: .status)
-            sortItem("Metod", field: .method)
+            sortItem("Metod", field: .method, swatch: MethodSwatch.image)
             sortItem("Manzil", field: .path)
         } label: {
             squareIcon("arrow.up.arrow.down", tint: store.sortField == .time && store.sortOrder == .descending ? LogXTheme.muted : LogXTheme.accent)
@@ -159,14 +159,14 @@ struct RequestFilterBar: View {
         .accessibilityLabel("Saralash")
     }
 
-    private func sortItem(_ title: String, field: LogSortField) -> some View {
-        Button {
-            store.toggleSort(field)
-        } label: {
-            if store.sortField == field {
-                Label("\(title) \(store.sortOrder == .ascending ? "↑" : "↓")", systemImage: "checkmark")
+    private func sortItem(_ title: String, field: LogSortField, swatch: NSImage? = nil) -> some View {
+        let active = store.sortField == field
+        let text = active ? "\(title) \(store.sortOrder == .ascending ? "↑" : "↓")" : title
+        return Toggle(isOn: Binding(get: { active }, set: { _ in store.toggleSort(field) })) {
+            if let swatch {
+                Label { Text(text) } icon: { Image(nsImage: swatch) }
             } else {
-                Text(title)
+                Text(text)
             }
         }
     }

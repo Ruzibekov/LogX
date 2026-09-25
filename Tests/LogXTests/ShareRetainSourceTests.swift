@@ -64,7 +64,7 @@ final class ShareRetainSourceTests: XCTestCase {
         let src = try source("Sources/LogX/Views/RequestList.swift")
         let filters = try source("Sources/LogX/Views/RequestFilterBar.swift")
         let live = try source("Sources/LogX/Views/RequestLiveBar.swift")
-        XCTAssertTrue(filters.contains("sortItem(\"Metod\", field: .method)"), filters)
+        XCTAssertTrue(filters.contains("sortItem(\"Metod\", field: .method, swatch: MethodSwatch.image)"), filters)
         XCTAssertTrue(filters.contains("sortItem(\"Manzil\", field: .path)"), filters)
         XCTAssertTrue(filters.contains("sortItem(\"Vaqt\", field: .time)"), filters)
         XCTAssertTrue(src.contains("ListGrouping.rows(store.visibleLogs)"), src)
