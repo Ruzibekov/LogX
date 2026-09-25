@@ -33,6 +33,7 @@ struct RequestRow: View {
         .onAppear(perform: enter)
         .onTapGesture { store.selectLog(log) }
         .onHover(perform: trackHover)
+        .onDisappear { store.rowHover.release(log.key) }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .accessibilityLabel("\(log.method) \(log.responseCode.map(String.init) ?? "NET") \(store.displayPath(log))")
@@ -46,11 +47,7 @@ struct RequestRow: View {
 
     private func trackHover(_ inside: Bool) {
         hovered = inside
-        if inside {
-            store.rowHover.key = log.key
-        } else if store.rowHover.key == log.key {
-            store.rowHover.key = nil
-        }
+        store.rowHover.update(log.key, inside: inside)
     }
 
     private var statusPill: some View {
@@ -229,11 +226,7 @@ struct RequestRowBackground: View {
 
     private func track(_ inside: Bool) {
         guard let key else { return }
-        if inside {
-            hover.key = key
-        } else if hover.key == key {
-            hover.key = nil
-        }
+        hover.update(key, inside: inside)
     }
 
     private var hovered: Bool { key != nil && hover.key == key }

@@ -4,6 +4,18 @@ import LogXCore
 @MainActor
 final class RowHover: ObservableObject {
     @Published var key: String?
+
+    func update(_ rowKey: String, inside: Bool) {
+        if inside {
+            key = rowKey
+        } else {
+            release(rowKey)
+        }
+    }
+
+    func release(_ rowKey: String) {
+        if key == rowKey { key = nil }
+    }
 }
 
 struct Toast: Identifiable, Equatable {
