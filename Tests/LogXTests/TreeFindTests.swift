@@ -142,8 +142,12 @@ final class TreeFindTests: XCTestCase {
         }
         XCTAssertEqual(yellowPixels(), 0)
         model.query = "s250x"
-        spin(0.45)
-        let shown = yellowPixels()
+        var shown = 0
+        let deadline = Date().addingTimeInterval(1.5)
+        repeat {
+            spin(0.05)
+            shown = yellowPixels()
+        } while shown <= 20 && Date() < deadline
         if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
             host.cacheDisplay(in: host.bounds, to: rep)
             let dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".screenshots")
