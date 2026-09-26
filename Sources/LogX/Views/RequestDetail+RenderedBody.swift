@@ -13,8 +13,9 @@ struct RenderedBody {
         var index: Int
         var tree: Bool
         var fontSize: CGFloat = 11.5
+        var pending: Bool = false
 
-        init(logKey: String, tab: DetailTab, redact: Bool, pretty: Bool, query: String, index: Int, tree: Bool, fontSize: CGFloat = 11.5) {
+        init(logKey: String, tab: DetailTab, redact: Bool, pretty: Bool, query: String, index: Int, tree: Bool, fontSize: CGFloat = 11.5, pending: Bool = false) {
             self.logKey = logKey
             self.tab = tab
             self.redact = redact
@@ -23,10 +24,11 @@ struct RenderedBody {
             self.index = index
             self.tree = tree
             self.fontSize = fontSize
+            self.pending = pending
         }
 
         var contentID: String {
-            "\(logKey)|\(tab.rawValue)|\(redact)|\(pretty)|\(tree)"
+            "\(logKey)|\(tab.rawValue)|\(redact)|\(pretty)|\(tree)|\(pending)"
         }
     }
 

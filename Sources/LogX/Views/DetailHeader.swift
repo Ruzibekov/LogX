@@ -321,7 +321,7 @@ enum DetailFacts {
     }
 
     static func codeLabel(_ log: NetworkLog) -> String {
-        log.responseCode.map(String.init) ?? "NET"
+        log.statusCodeLabel
     }
 
     static func reasonIsShort(_ reason: String) -> Bool {

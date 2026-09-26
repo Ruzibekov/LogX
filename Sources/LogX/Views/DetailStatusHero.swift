@@ -9,10 +9,10 @@ struct DetailStatusHero: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             content
-                .id(log.key)
+                .id(HeroIdentity(key: log.key, pending: log.isPending))
                 .transition(.opacity)
         }
-        .animation(LogXMotion.statusCrossfade, value: log.key)
+        .animation(LogXMotion.statusCrossfade, value: HeroIdentity(key: log.key, pending: log.isPending))
         .accessibilityElement(children: .combine)
     }
 
@@ -34,7 +34,35 @@ struct DetailStatusHero: View {
 
     private var codeSize: CGFloat { compact ? 34 : LogXType.statusHero }
 
+    @ViewBuilder
     private var codeBlock: some View {
+        if log.isPending {
+            pendingBlock
+        } else {
+            answeredBlock
+        }
+    }
+
+    private var pendingBlock: some View {
+        PendingTicker(ts: log.ts) { stale, elapsed in
+            HStack(alignment: .center, spacing: 12) {
+                PendingStatusMark(ts: log.ts, spinner: compact ? .small : .regular, staleSize: compact ? 18 : 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stale ? "Javob kelmadi" : log.statusDescription)
+                        .font(LogXType.mono(compact ? 13 : 18))
+                        .foregroundStyle(LogXTheme.text2)
+                    Text(elapsed)
+                        .font(LogXType.mono(compact ? 12 : 14))
+                        .monospacedDigit()
+                        .foregroundStyle(LogXTheme.muted)
+                }
+            }
+            .frame(minHeight: compact ? 34 : 56, alignment: .leading)
+            .accessibilityLabel(stale ? "Javob kelmadi" : "Javob kutilmoqda")
+        }
+    }
+
+    private var answeredBlock: some View {
         let reason = log.statusDescription
         let short = DetailFacts.reasonIsShort(reason)
         return HStack(alignment: .lastTextBaseline, spacing: 8) {
@@ -54,6 +82,11 @@ struct DetailStatusHero: View {
                 .textSelection(.enabled)
         }
         .padding(.vertical, compact ? 0 : -6)
+    }
+
+    private struct HeroIdentity: Hashable {
+        let key: String
+        let pending: Bool
     }
 
     private var factsRow: some View {

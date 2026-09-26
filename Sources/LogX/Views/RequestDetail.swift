@@ -17,6 +17,7 @@ struct RequestDetail: View {
     @State var treeMatchCount = 0
     @StateObject var shareHost = SharePickerHost()
     @State private var bodyCache: RenderedBody?
+    @State private var settledKey: String?
     @State var findCount: FindCount?
 
     var isWrapBody: Bool { wrapBody }
@@ -54,7 +55,8 @@ struct RequestDetail: View {
             query: tree ? "" : findQuery,
             index: tree ? 0 : findIndex,
             tree: tree,
-            fontSize: CGFloat(fontSize)
+            fontSize: CGFloat(fontSize),
+            pending: log.isPending
         )
     }
 
@@ -90,6 +92,9 @@ struct RequestDetail: View {
                             .background(bodyWell)
                             .padding(10)
                     }
+                } else if tab == .response && log.isPending {
+                    PendingResponseView(ts: log.ts)
+                        .background(codeWell)
                 } else if let rendered, let tree = rendered.tree {
                     JSONTreeView(tree: tree, query: findQuery, activeIndex: findIndex) { treeMatchCount = $0 }
                         .id(tree.identity)
@@ -109,11 +114,15 @@ struct RequestDetail: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(settledKey == log.key ? LogXMotion.statusCrossfade : nil, value: log.isPending)
             SharePickerAnchor(host: shareHost)
                 .frame(width: 1, height: 1)
         }
         .onChange(of: key) { _, next in
             findCount = FindCount.snapshot(from: bodyCache, for: next)
+        }
+        .onChange(of: log.key, initial: true) { _, next in
+            settledKey = next
         }
         .task(id: key) {
             await render(log: log, key: key)

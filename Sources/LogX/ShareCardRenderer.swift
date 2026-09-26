@@ -98,7 +98,7 @@ enum ShareCardRenderer {
     }
 
     private static func header(_ log: NetworkLog, redact: Bool) -> Header {
-        let code = log.responseCode.map(String.init) ?? "NET"
+        let code = log.statusCodeLabel
         let rawURL = log.url.isEmpty ? log.api : log.url
         let url = redact ? Redactor.maskURL(rawURL) : rawURL
         let app = log.appShortLabel == AppProfile.unknown.shortLabel ? "" : log.appShortLabel

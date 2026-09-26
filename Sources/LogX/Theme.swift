@@ -66,6 +66,7 @@ enum StatusTone: Equatable {
         case .err4xx: return .warn
         case .err5xx: return .err
         case .net: return .muted
+        case .pending: return .neutral
         case .all: return .text
         }
     }

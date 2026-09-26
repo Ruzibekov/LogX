@@ -50,6 +50,7 @@ public struct LogValue: Decodable {
     public var requestBody: LooseText?
     public var responseBody: LooseText?
     public var _slim: Bool?
+    public var _pending: Bool?
     public var moduleId: String?
     public var moduleName: String?
     public var environment: String?
@@ -86,6 +87,7 @@ public struct LogValue: Decodable {
             requestBody: requestBody?.text,
             responseBody: responseBody?.text,
             isFull: _slim == false,
+            isPending: _pending == true,
             moduleId: moduleId,
             moduleName: moduleName,
             environment: environment,

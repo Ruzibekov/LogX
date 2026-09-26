@@ -91,7 +91,7 @@ struct DiffView: View {
                         .help(store.shareableURL(log))
                 }
                 HStack(spacing: 8) {
-                    Text(log.responseCode.map(String.init) ?? "NET")
+                    Text(log.statusCodeLabel)
                         .font(LogXType.mono(LogXType.caption, .bold))
                         .foregroundStyle(LogXTheme.status(log.statusClass))
                     Text(log.formattedDuration)

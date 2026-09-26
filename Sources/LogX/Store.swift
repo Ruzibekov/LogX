@@ -53,6 +53,7 @@ final class LogStore: ObservableObject {
     var toastTask: Task<Void, Never>?
     /// Pidlar noma'lum bo'lib qolgan streak — server pid xaritasi eskirgan (ilova qayta ochilgan).
     var unknownAppStreak: [String: Int] = [:]
+    var unknownStreakKeys: [String: Set<String>] = [:]
     var lastUnknownReopen: [String: Date] = [:]
     var refreshFailures = 0
     var clearedKeys: Set<String> = []

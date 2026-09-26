@@ -39,6 +39,7 @@ public enum StatusClass: String, Equatable, Sendable, CaseIterable {
     }
 
     case all
+    case pending
     case ok2xx
     case redirect3xx
     case err4xx
@@ -48,6 +49,7 @@ public enum StatusClass: String, Equatable, Sendable, CaseIterable {
     public var title: String {
         switch self {
         case .all: return "Barchasi"
+        case .pending: return "Kutilmoqda"
         case .ok2xx: return "2xx"
         case .redirect3xx: return "3xx"
         case .err4xx: return "4xx"
@@ -101,11 +103,13 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         set { responseBodyPacked = PackedText(newValue) }
     }
     public var isFull: Bool
+    public var isPending: Bool
     var metaBox: NetworkLogMetaBox = .empty
 
     public var id: String { key }
 
     public var statusClass: StatusClass {
+        if isPending { return .pending }
         guard let code = responseCode else { return .net }
         if code >= 500 { return .err5xx }
         if code >= 400 { return .err4xx }
@@ -155,6 +159,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
     }
 
     public var statusDescription: String {
+        if isPending { return StatusClass.pending.title }
         if let msg = responseMessage, !msg.isEmpty { return msg }
         guard let code = responseCode else { return error ?? "Network Error" }
         switch code {
@@ -220,6 +225,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         requestBody: String? = nil,
         responseBody: String? = nil,
         isFull: Bool = false,
+        isPending: Bool = false,
         moduleId: String? = nil,
         moduleName: String? = nil,
         environment: String? = nil,
@@ -252,6 +258,7 @@ public struct NetworkLog: Identifiable, Equatable, Sendable {
         self.requestBodyPacked = PackedText(requestBody)
         self.responseBodyPacked = PackedText(responseBody)
         self.isFull = isFull
+        self.isPending = isPending
         self.metaBox = NetworkLogMetaBox.make(NetworkLogMeta(
             feature: pool.intern(feature),
             source: pool.intern(source),

@@ -36,7 +36,7 @@ struct RequestRow: View {
         .onDisappear { store.rowHover.release(log.key) }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityLabel("\(log.method) \(log.responseCode.map(String.init) ?? "NET") \(store.displayPath(log))")
+        .accessibilityLabel("\(log.method) \(log.isPending ? "kutilmoqda" : log.statusCodeLabel) \(store.displayPath(log))")
     }
 
     private func enter() {
@@ -51,14 +51,23 @@ struct RequestRow: View {
     }
 
     private var statusPill: some View {
-        Text(log.responseCode.map(String.init) ?? "NET")
-            .font(LogXType.mono(11, .bold))
-            .foregroundStyle(LogXTheme.status(log.statusClass))
-            .lineLimit(1)
+        ZStack {
+            if log.isPending {
+                PendingStatusMark(ts: log.ts, spinner: .mini, staleSize: 11)
+                    .transition(.opacity)
+            } else {
+                Text(log.statusCodeLabel)
+                    .font(LogXType.mono(11, .bold))
+                    .foregroundStyle(LogXTheme.status(log.statusClass))
+                    .lineLimit(1)
+                    .transition(.opacity)
+            }
+        }
             .frame(width: 44, height: 22)
             .background(LogXTheme.statusTint(log.statusClass), in: RoundedRectangle(cornerRadius: LogXRadius.chip, style: .continuous))
+            .animation(LogXMotion.statusCrossfade, value: log.isPending)
             .help(log.statusDescription)
-            .accessibilityLabel("Status \(log.responseCode.map(String.init) ?? "tarmoq xatosi")")
+            .accessibilityLabel("Status \(log.isPending ? "kutilmoqda" : log.responseCode.map(String.init) ?? "tarmoq xatosi")")
     }
 
     private var metaLine: some View {
@@ -136,10 +145,15 @@ struct RequestRow: View {
 
     private var metrics: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Text(log.formattedDuration)
-                .font(LogXType.mono(LogXType.meta, selected ? .semibold : .medium))
-                .foregroundStyle(durationColor)
-                .lineLimit(1)
+            if log.isPending {
+                PendingElapsed(ts: log.ts, font: LogXType.mono(LogXType.meta, selected ? .semibold : .medium))
+                    .foregroundStyle(LogXTheme.text2)
+            } else {
+                Text(log.formattedDuration)
+                    .font(LogXType.mono(LogXType.meta, selected ? .semibold : .medium))
+                    .foregroundStyle(durationColor)
+                    .lineLimit(1)
+            }
             if showTimeColumn {
                 Text(RelativeTime.clock(ts: log.ts))
                     .font(LogXType.mono(10.5))

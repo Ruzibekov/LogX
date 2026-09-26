@@ -122,10 +122,17 @@ extension LogStore {
     /// kelsa stream qayta ochiladi (30 s da bir martadan ko'p emas).
     func noteUnknownApps(serial: String, items: [NetworkLog]) {
         var streak = unknownAppStreak[serial] ?? 0
-        for item in items {
-            streak = item.resolvedAppId == AppProfile.unknownId ? streak + 1 : 0
+        var counted = unknownStreakKeys[serial] ?? []
+        for item in items where !item.isPending {
+            if item.resolvedAppId == AppProfile.unknownId {
+                if counted.insert(item.key).inserted { streak += 1 }
+            } else {
+                streak = 0
+                counted.removeAll()
+            }
         }
         unknownAppStreak[serial] = streak
+        unknownStreakKeys[serial] = counted
         guard streak >= LogStore.unknownStreakLimit else { return }
         let now = Date()
         if let last = lastUnknownReopen[serial], now.timeIntervalSince(last) < LogStore.unknownReopenThrottle {
@@ -133,6 +140,7 @@ extension LogStore {
         }
         lastUnknownReopen[serial] = now
         unknownAppStreak[serial] = 0
+        unknownStreakKeys[serial] = nil
         LogXLog.write("stream reopen serial=\(serial) reason=unknown-app-streak")
         liveTasks[serial]?.cancel()
         liveTasks[serial] = nil
@@ -148,12 +156,9 @@ extension LogStore {
     func ingestBatch(_ items: [NetworkLog]) {
         guard !items.isEmpty else { return }
         if isPaused {
-            var arrived: [NetworkLog] = []
-            arrived.reserveCapacity(items.count)
             for item in items where !clearedKeys.contains(item.key) {
-                arrived.append(BodyBudget.clamp(item))
+                bufferWhilePaused(BodyBudget.clamp(item))
             }
-            pendingWhilePaused.append(contentsOf: arrived)
             if pendingWhilePaused.count > maxLogCapacity {
                 pendingWhilePaused.removeFirst(pendingWhilePaused.count - maxLogCapacity)
             }
@@ -166,6 +171,7 @@ extension LogStore {
             var item = BodyBudget.clamp(rawItem)
             if clearedKeys.contains(item.key) { continue }
             if let existing = liveByKey[item.key] {
+                if item.isPending && !existing.isPending { continue }
                 if item.ts == nil || (existing.ts ?? 0) > 0 { item.ts = existing.ts }
                 if existing != item {
                     upsertLive(item)
@@ -191,6 +197,17 @@ extension LogStore {
             }
         }
         reconcileSelection()
+    }
+
+    private func bufferWhilePaused(_ incoming: NetworkLog) {
+        var item = incoming
+        if let idx = pendingWhilePaused.lastIndex(where: { $0.key == item.key }) {
+            let buffered = pendingWhilePaused[idx]
+            if item.isPending && !buffered.isPending { return }
+            if item.ts == nil || (buffered.ts ?? 0) > 0 { item.ts = buffered.ts }
+            pendingWhilePaused.remove(at: idx)
+        }
+        pendingWhilePaused.append(item)
     }
 
     func pollLoop() async {
