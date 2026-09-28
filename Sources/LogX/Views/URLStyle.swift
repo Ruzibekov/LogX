@@ -60,6 +60,12 @@ enum URLStyle {
         return result
     }
 
+    static func pathAndQuery(_ raw: String, size: CGFloat, weight: Font.Weight = .medium) -> (path: AttributedString, query: AttributedString?) {
+        let full = attributed(raw, size: size, weight: weight)
+        guard let mark = full.characters.firstIndex(of: "?") else { return (full, nil) }
+        return (AttributedString(full[full.startIndex..<mark]), AttributedString(full[mark..<full.endIndex]))
+    }
+
     static func clearCache() {
         lock.lock()
         cache.removeAll()

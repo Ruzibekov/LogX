@@ -118,10 +118,19 @@ struct RequestRow: View {
 
     private var pathLine: some View {
         HStack(spacing: 6) {
-            Text(URLStyle.attributed(store.displayPath(log), size: LogXType.body, weight: selected ? .semibold : .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(store.shareableURL(log))
+            let parts = URLStyle.pathAndQuery(store.displayPath(log), size: LogXType.body, weight: selected ? .semibold : .medium)
+            HStack(spacing: 0) {
+                Text(parts.path)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    .layoutPriority(1)
+                if let query = parts.query {
+                    Text(query)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+            .help(store.shareableURL(log))
 
             if hovered || copied {
                 Button {
