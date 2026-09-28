@@ -45,11 +45,15 @@ struct EndpointSplitLayout: Layout {
         let split: (path: CGFloat, query: CGFloat) = ideals.count > 1
             ? widths(available: bounds.width, path: ideals[0], query: ideals[1])
             : (bounds.width, 0)
-        var x = bounds.minX
-        for (index, subview) in subviews.enumerated() {
-            let width = index == 0 ? split.path : split.query
-            subview.place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading, proposal: ProposedViewSize(width: width, height: bounds.height))
-            x += width
+        let pathProposal = ProposedViewSize(width: split.path, height: bounds.height)
+        let pathWidth = subviews.first?.sizeThatFits(pathProposal).width ?? 0
+        subviews.first?.place(at: CGPoint(x: bounds.minX, y: bounds.midY), anchor: .leading, proposal: pathProposal)
+        if subviews.count > 1 {
+            subviews[1].place(
+                at: CGPoint(x: bounds.minX + pathWidth, y: bounds.midY),
+                anchor: .leading,
+                proposal: ProposedViewSize(width: bounds.width - pathWidth, height: bounds.height)
+            )
         }
     }
 }
