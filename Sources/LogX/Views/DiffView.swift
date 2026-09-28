@@ -83,11 +83,7 @@ struct DiffView: View {
                     Text(log.method.uppercased())
                         .font(LogXType.mono(LogXType.caption, .bold))
                         .foregroundStyle(LogXTheme.text2)
-                    Text(store.displayPath(log))
-                        .font(LogXType.mono(LogXType.body))
-                        .foregroundStyle(LogXTheme.text)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    EndpointURLText(raw: store.displayPath(log), size: LogXType.body, mono: true)
                         .help(store.shareableURL(log))
                 }
                 HStack(spacing: 8) {

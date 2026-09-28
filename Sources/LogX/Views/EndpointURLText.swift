@@ -5,9 +5,10 @@ struct EndpointURLText: View {
     let size: CGFloat
     var weight: Font.Weight = .medium
     var selectable = false
+    var mono = false
 
     var body: some View {
-        let parts = URLStyle.pathAndQuery(raw, size: size, weight: weight)
+        let parts = mono ? URLStyle.monoPathAndQuery(raw, size: size) : URLStyle.pathAndQuery(raw, size: size, weight: weight)
         HStack(spacing: 0) {
             Text(parts.path)
                 .lineLimit(1)

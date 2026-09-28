@@ -61,7 +61,17 @@ enum URLStyle {
     }
 
     static func pathAndQuery(_ raw: String, size: CGFloat, weight: Font.Weight = .medium) -> (path: AttributedString, query: AttributedString?) {
-        let full = attributed(raw, size: size, weight: weight)
+        splitQuery(attributed(raw, size: size, weight: weight))
+    }
+
+    static func monoPathAndQuery(_ raw: String, size: CGFloat) -> (path: AttributedString, query: AttributedString?) {
+        var full = AttributedString(raw)
+        full.font = LogXType.mono(size)
+        full.foregroundColor = LogXTheme.text
+        return splitQuery(full)
+    }
+
+    static func splitQuery(_ full: AttributedString) -> (path: AttributedString, query: AttributedString?) {
         guard let mark = full.characters.firstIndex(of: "?") else { return (full, nil) }
         return (AttributedString(full[full.startIndex..<mark]), AttributedString(full[mark..<full.endIndex]))
     }
