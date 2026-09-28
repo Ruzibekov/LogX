@@ -15,10 +15,7 @@ struct DetailHeader: View {
             HStack(alignment: .center, spacing: 10) {
                 MethodBadge(method: log.method, size: 11)
 
-                Text(URLStyle.attributed(store.shareableURL(log), size: LogXType.title, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
+                EndpointURLText(raw: store.shareableURL(log), size: LogXType.title, selectable: true)
                     .help(store.shareableURL(log))
                     .frame(minWidth: 80, alignment: .leading)
 
