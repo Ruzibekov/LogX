@@ -68,6 +68,9 @@ struct RenderedBody {
         }
         let body = JSONFormat.body(for: log, tab: key.tab, redact: key.redact, pretty: key.pretty)
         var display = body.isEmpty ? "—" : body
+        if key.tab == .request || key.tab == .response {
+            display = OpaqueStringElider.elide(display)
+        }
         var notice: String?
         if display.utf8.count > displayLimitBytes {
             let cut = String(decoding: display.utf8.prefix(displayLimitBytes), as: UTF8.self)
