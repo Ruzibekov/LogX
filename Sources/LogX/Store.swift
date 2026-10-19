@@ -55,6 +55,8 @@ final class LogStore: ObservableObject {
     var unknownAppStreak: [String: Int] = [:]
     var unknownStreakKeys: [String: Set<String>] = [:]
     var lastUnknownReopen: [String: Date] = [:]
+    var streamOpenedAtMs: [String: Double] = [:]
+    var newestLogTsBySerial: [String: Double] = [:]
     var refreshFailures = 0
     var clearedKeys: Set<String> = []
     var clearedSnapshot: [String: NetworkLog] = [:]

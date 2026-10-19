@@ -42,13 +42,28 @@ public enum LiveStreamURL {
         CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
     }()
 
-    public static func httpStream(base: URL, serial: String, tail: Int = 80) -> URL? {
+    public static func httpStream(base: URL, serial: String, tail: Int = 80, sinceMs: Int64? = nil) -> URL? {
         guard var comps = URLComponents(url: base, resolvingAgainstBaseURL: true) else { return nil }
         let basePath = comps.path
         comps.path = basePath.hasSuffix("/") ? basePath + "api/http-stream" : basePath + "/api/http-stream"
         let encodedSerial = serial.addingPercentEncoding(withAllowedCharacters: serialAllowed) ?? serial
-        comps.percentEncodedQuery = "serial=\(encodedSerial)&tail=\(tail)"
+        var query = "serial=\(encodedSerial)&tail=\(tail)"
+        if let sinceMs, sinceMs > 0 { query += "&since=\(sinceMs)" }
+        comps.percentEncodedQuery = query
         return comps.url
+    }
+}
+
+public enum StreamReplayWindow: Sendable {
+    public static let lookbackMs: Double = 10_000
+    public static let maxAgeMs: Double = 14 * 60 * 1000
+
+    public static func sinceMs(newestLogMs: Double?, openedAtMs: Double?, nowMs: Double) -> Int64? {
+        let anchor = [newestLogMs, openedAtMs].compactMap { $0 }.filter { $0.isFinite && $0 > 0 }.max()
+        guard let anchor, nowMs.isFinite, nowMs > 0 else { return nil }
+        let wanted = min(anchor, nowMs) - lookbackMs
+        let clamped = max(wanted, nowMs - maxAgeMs)
+        return Int64(clamped.rounded(.down))
     }
 }
 

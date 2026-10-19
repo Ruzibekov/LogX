@@ -65,7 +65,12 @@ extension LogStore {
         }
 
         while !Task.isCancelled {
-            guard let url = LiveStreamURL.httpStream(base: client.baseURL, serial: serial, tail: 1000) else {
+            guard let url = LiveStreamURL.httpStream(
+                base: client.baseURL,
+                serial: serial,
+                tail: 1000,
+                sinceMs: replaySinceMs(serial: serial)
+            ) else {
                 setHealth(serial, .failed("bad url"))
                 return
             }
@@ -75,6 +80,7 @@ extension LogStore {
             req.timeoutInterval = LiveStreamPump.idleTimeout
 
             let startedAt = Date()
+            streamOpenedAtMs[serial] = startedAt.timeIntervalSince1970 * 1000
             var reason = "eof"
             do {
                 try await LiveStreamPump.run(request: req, serial: serial) { chunk in
@@ -108,6 +114,7 @@ extension LogStore {
             setHealth(serial, .live)
         case .logs(let items):
             if bannerIsStreamNotice { setBanner(nil) }
+            noteNewestLog(serial: serial, items: items)
             ingestBatch(items)
             noteUnknownApps(serial: serial, items: items)
         case .serverError(let message):
@@ -147,10 +154,31 @@ extension LogStore {
         syncLiveStreams()
     }
 
+    func replaySinceMs(serial: String, now: Date = Date()) -> Int64? {
+        let opened = streamOpenedAtMs[serial]
+        let newest = newestLogTsBySerial[serial]
+        guard opened != nil || newest != nil else { return nil }
+        return StreamReplayWindow.sinceMs(
+            newestLogMs: newest,
+            openedAtMs: opened,
+            nowMs: now.timeIntervalSince1970 * 1000
+        )
+    }
+
+    func noteNewestLog(serial: String, items: [NetworkLog]) {
+        guard let newest = items.compactMap(\.ts).filter({ $0 > 10_000_000_000 }).max() else { return }
+        newestLogTsBySerial[serial] = max(newestLogTsBySerial[serial] ?? 0, newest)
+    }
+
     func setHealth(_ serial: String, _ health: StreamHealth) {
         if streamHealthBySerial[serial] == health { return }
         streamHealthBySerial[serial] = health
         publishConnection()
+    }
+
+    static func earliestTs(_ existing: Double?, _ incoming: Double?) -> Double? {
+        let known = [existing, incoming].compactMap { $0 }.filter { $0 > 0 }
+        return known.min() ?? existing ?? incoming
     }
 
     func ingestBatch(_ items: [NetworkLog]) {
@@ -172,7 +200,7 @@ extension LogStore {
             if clearedKeys.contains(item.key) { continue }
             if let existing = liveByKey[item.key] {
                 if item.isPending && !existing.isPending { continue }
-                if item.ts == nil || (existing.ts ?? 0) > 0 { item.ts = existing.ts }
+                item.ts = LogStore.earliestTs(existing.ts, item.ts)
                 if existing != item {
                     upsertLive(item)
                     queryMatchCache.removeValue(forKey: item.key)
@@ -204,7 +232,7 @@ extension LogStore {
         if let idx = pendingWhilePaused.lastIndex(where: { $0.key == item.key }) {
             let buffered = pendingWhilePaused[idx]
             if item.isPending && !buffered.isPending { return }
-            if item.ts == nil || (buffered.ts ?? 0) > 0 { item.ts = buffered.ts }
+            item.ts = LogStore.earliestTs(buffered.ts, item.ts)
             pendingWhilePaused.remove(at: idx)
         }
         pendingWhilePaused.append(item)
